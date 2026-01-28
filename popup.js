@@ -6,7 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentSpeed = 1.0;
 
     // Load saved settings
-    chrome.storage.local.get(['playbackSpeed', 'autoAdvanceEnabled', 'shortcutsEnabled'], (result) => {
+    chrome.storage.local.get(['playbackSpeed', 'autoAdvanceEnabled', 'shortcutsEnabled', 'autoReadEnabled'], (result) => {
         if (result.playbackSpeed) {
             currentSpeed = result.playbackSpeed;
             updateUI(currentSpeed);
@@ -24,6 +24,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (sToggle) sToggle.checked = result.shortcutsEnabled;
         } else {
             console.log("Popup: shortcutsEnabled is undefined in storage.");
+        }
+
+        // Auto Read Toggle
+        if (result.autoReadEnabled !== undefined) {
+            const arToggle = document.getElementById('autoReadToggle');
+            if (arToggle) arToggle.checked = result.autoReadEnabled;
         }
     });
 
@@ -82,6 +88,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     chrome.tabs.sendMessage(tabs[0].id, { type: 'UPDATE_SHORTCUTS', enabled: isEnabled });
                 }
             });
+        });
+    }
+
+    // Listener para o novo Toggle Auto Read
+    const arToggle = document.getElementById('autoReadToggle');
+    if (arToggle) {
+        arToggle.addEventListener('change', (e) => {
+            const isEnabled = e.target.checked;
+            chrome.storage.local.set({ autoReadEnabled: isEnabled });
+            console.log("Auto-Read toggled:", isEnabled);
         });
     }
 });
