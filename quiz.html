@@ -10,6 +10,8 @@
             --accent-color: #2A7AE4;
             --subtext-color: #666;
             --border-color: #eee;
+            --hint-bg: #f7f7f7;
+            /* Fundo sutil para a dica aberta */
 
             /* Cores dos Botões (Claro) */
             --opt-bg: white;
@@ -19,10 +21,8 @@
             /* Estados (Claro) */
             --selected-bg: #e6f1ff;
             --selected-border: #2A7AE4;
-
             --correct-bg: #f0fffc;
             --correct-border: #00c4a7;
-
             --wrong-bg: #ffe6e6;
             --wrong-border: #e42a2a;
         }
@@ -34,19 +34,18 @@
                 --accent-color: #5CA4FF;
                 --subtext-color: #aaa;
                 --border-color: #333;
+                --hint-bg: #252526;
 
                 /* Cores dos Botões (Escuro) */
                 --opt-bg: #2d2d2d;
                 --opt-border: #444;
                 --opt-hover-bg: #3a3a3a;
 
-                /* Estados (Escuro) - Usando transparência para ficar suave */
+                /* Estados (Escuro) */
                 --selected-bg: rgba(42, 122, 228, 0.2);
                 --selected-border: #5CA4FF;
-
                 --correct-bg: rgba(0, 196, 167, 0.15);
                 --correct-border: #00c4a7;
-
                 --wrong-bg: rgba(228, 42, 42, 0.2);
                 --wrong-border: #ff5f5f;
             }
@@ -58,71 +57,144 @@
             background-color: var(--bg-color);
             color: var(--text-color);
             transition: background-color 0.3s;
+            line-height: 1.5;
         }
 
-        h2 {
-            font-size: 1.1em;
-            margin-bottom: 5px;
+        /* --- CORREÇÃO DO ENUNCIADO (mantida do passo anterior) --- */
+        h2#question {
+            font-size: 1rem;
+            font-weight: 500;
+            line-height: 1.6;
+            margin-bottom: 15px;
             color: var(--text-color);
+        }
+
+        h2#question * {
+            font-size: inherit !important;
+            font-weight: inherit !important;
+            color: inherit !important;
+            margin: 0;
+            line-height: inherit;
         }
 
         .label-text {
             font-weight: bold;
             color: var(--accent-color);
             display: block;
-            margin-bottom: 5px;
+            margin-bottom: 8px;
             text-transform: uppercase;
-            font-size: 0.8em;
-            letter-spacing: 0.5px;
+            font-size: 0.75em;
+            letter-spacing: 1px;
         }
 
         .options-header-group {
-            margin-top: 20px;
-            margin-bottom: 10px;
+            margin-top: 25px;
+            margin-bottom: 15px;
             border-bottom: 1px solid var(--border-color);
             padding-bottom: 5px;
-        }
-
-        .small-hint {
-            font-size: 0.75em;
-            color: var(--subtext-color);
-            font-weight: normal;
-            margin-left: 5px;
         }
 
         .options {
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 12px;
         }
 
+        /* --- ESTILO DOS BOTÕES COM SPOILER --- */
         .option-btn {
             background: var(--opt-bg);
             border: 1px solid var(--opt-border);
             color: var(--text-color);
-            padding: 12px;
-            border-radius: 6px;
+            padding: 12px 15px;
+            /* Padding ajustado */
+            border-radius: 8px;
             text-align: left;
             cursor: pointer;
             transition: all 0.2s;
             font-size: 0.95em;
+            /* Mudança crucial: Flex Column para empilhar texto e dica */
+            display: flex;
+            flex-direction: column;
+            line-height: 1.4;
+        }
+
+        /* Linha principal (Letra + Texto) */
+        .opt-main-row {
             display: flex;
             align-items: flex-start;
+            width: 100%;
         }
 
         .option-index {
             font-weight: bold;
-            margin-right: 8px;
+            margin-right: 12px;
             min-width: 20px;
             color: var(--accent-color);
         }
 
+        /* Linha da Dica (Spoiler) */
+        .opt-hint-row {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px dashed var(--border-color);
+            font-size: 0.85em;
+            /* Fonte bem menor para a dica */
+            width: 100%;
+        }
+
+        /* Quando a dica está aberta, damos um destaque sutil no fundo */
+        .opt-hint-row.active {
+            background-color: var(--hint-bg);
+            margin-left: -15px;
+            margin-right: -15px;
+            /* Compensa o padding do botão pai */
+            padding-left: 15px;
+            padding-right: 15px;
+            padding-bottom: 5px;
+            border-bottom-left-radius: 8px;
+            border-bottom-right-radius: 8px;
+            margin-bottom: -12px;
+            /* Compensa padding inferior do pai */
+        }
+
+        /* O "link" para clicar */
+        .hint-toggle {
+            color: var(--accent-color);
+            cursor: pointer;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            user-select: none;
+            /* Evita selecionar o texto ao clicar rápido */
+        }
+
+        .hint-toggle:hover {
+            text-decoration: underline;
+        }
+
+        /* O conteúdo da dica */
+        .hint-content {
+            margin-top: 8px;
+            color: var(--subtext-color);
+            font-style: italic;
+            padding-left: 5px;
+            border-left: 2px solid var(--accent-color);
+            /* Barrinha lateral para destacar */
+        }
+
+        /* Utilitário para esconder */
+        .hidden {
+            display: none !important;
+        }
+
+
+        /* --- Estados (Hover, Selected, Correct, Wrong) --- */
         .option-btn:hover {
             border-color: var(--accent-color);
             background-color: var(--opt-hover-bg);
         }
 
-        /* Sugestão visual (Highlight sutil) */
         .option-btn.correct {
             border-left: 5px solid var(--correct-border);
             background-color: var(--correct-bg);
@@ -150,8 +222,10 @@
 
         .opinion-text {
             display: block;
-            margin-top: 5px;
-            font-size: 0.85em;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid var(--border-color);
+            font-size: 0.9em;
             color: var(--subtext-color);
             font-style: italic;
         }

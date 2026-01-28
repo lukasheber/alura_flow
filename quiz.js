@@ -25,53 +25,87 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // 2. Options Rendering
             const optionsContainer = document.getElementById('options');
+            // Clear previous options (safety)
+            optionsContainer.innerHTML = '';
+
             result.currentQuiz.options.forEach((opt, index) => {
-                const button = document.createElement('button');
-                button.className = 'option-btn';
-                button.dataset.id = opt.id; // Store ID for easy access
+                const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+                const letter = (index < letters.length ? letters[index] : index + 1);
+
+                // 1. Main Button (Option Container)
+                const btn = document.createElement('button');
+                btn.className = 'option-btn';
+                btn.dataset.id = opt.id; // Store ID for easy access
 
                 if (opt.isCorrect) {
-                    button.classList.add('correct');
+                    btn.classList.add('correct');
                 }
 
-                // Add numbering (A, B, C...)
-                const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-                const prefix = (index < letters.length ? letters[index] : index + 1) + ")";
+                // 2. Main Row (Index + HTML Content)
+                const mainRow = document.createElement('div');
+                mainRow.className = 'opt-main-row';
 
-                // Create inner structure for alignment
                 const indexSpan = document.createElement('span');
                 indexSpan.className = 'option-index';
-                indexSpan.textContent = prefix;
-
-                const contentWrapper = document.createElement('div');
-                contentWrapper.style.display = "flex";
-                contentWrapper.style.flexDirection = "column";
+                indexSpan.textContent = letter;
 
                 const textSpan = document.createElement('span');
                 textSpan.innerHTML = opt.html;
 
-                contentWrapper.appendChild(textSpan);
+                mainRow.appendChild(indexSpan);
+                mainRow.appendChild(textSpan);
+                btn.appendChild(mainRow);
 
-                // Add Hidden Hint (Opinion)
+                // 3. Spoiler Logic (Hint), if exists
                 if (opt.opinionHTML) {
-                    const opinionSpan = document.createElement('span');
-                    opinionSpan.className = 'opinion-text';
-                    // Strip heavy paragraphs if needed, or just insert
-                    opinionSpan.innerHTML = `(${opt.opinionHTML})`; // Parentheses as requested
-                    contentWrapper.appendChild(opinionSpan);
+                    const hintRow = document.createElement('div');
+                    hintRow.className = 'opt-hint-row';
+
+                    // The "link" to toggle hint
+                    const toggleTrigger = document.createElement('span');
+                    toggleTrigger.className = 'hint-toggle';
+                    toggleTrigger.innerHTML = '<span style="font-size: 1.1em">🗨️</span> Ver dica';
+
+                    // The hint content container (hidden by default)
+                    const hintContent = document.createElement('div');
+                    hintContent.className = 'hint-content hidden';
+
+                    // Remove parentheses manually if present
+                    let cleanHint = opt.opinionHTML;
+                    if (cleanHint.trim().startsWith('(') && cleanHint.trim().endsWith(')')) {
+                        cleanHint = cleanHint.trim().substring(1, cleanHint.trim().length - 1);
+                    }
+                    hintContent.innerHTML = cleanHint;
+
+                    // Click event ONLY on the trigger
+                    toggleTrigger.onclick = (e) => {
+                        // IMPORTANT: Prevent clicking hint from selecting the answer
+                        e.stopPropagation();
+
+                        const isHidden = hintContent.classList.toggle('hidden');
+                        if (isHidden) {
+                            toggleTrigger.innerHTML = '<span style="font-size: 1.1em">🗨️</span> Ver dica';
+                            hintRow.classList.remove('active');
+                        } else {
+                            toggleTrigger.innerHTML = '❌ Esconder dica';
+                            hintRow.classList.add('active');
+                        }
+                    };
+
+                    hintRow.appendChild(toggleTrigger);
+                    hintRow.appendChild(hintContent);
+                    btn.appendChild(hintRow);
                 }
 
-                button.appendChild(indexSpan);
-                button.appendChild(contentWrapper);
-
-                button.addEventListener('click', () => {
+                // 4. Click Event on Main Button (Select Answer)
+                btn.onclick = () => {
                     // Visual Toggle
                     if (result.currentQuiz.isMultiple) {
-                        button.classList.toggle('selected');
+                        btn.classList.toggle('selected');
                     } else {
                         // Clear others
                         document.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
-                        button.classList.add('selected');
+                        btn.classList.add('selected');
                     }
 
                     // Clear previous error states
@@ -79,9 +113,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     lastClickedOptionId = opt.id;
                     selectOption(opt.id);
-                });
+                };
 
-                optionsContainer.appendChild(button);
+                optionsContainer.appendChild(btn);
             });
         }
     });
