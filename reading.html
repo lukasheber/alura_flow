@@ -180,6 +180,41 @@
                 background-color: rgba(92, 164, 255, 0.15);
             }
         }
+
+        /* Botão Flutuante de Controle TTS */
+        .fab-control {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            z-index: 1000;
+            transition: transform 0.2s, opacity 0.3s;
+            opacity: 0;
+            /* Escondido por padrão */
+            pointer-events: none;
+            /* Não clica quando invisível */
+        }
+
+        .fab-control.visible {
+            opacity: 1;
+            pointer-events: auto;
+            transform: scale(1);
+        }
+
+        .fab-control:active {
+            transform: scale(0.95);
+        }
     </style>
 </head>
 
@@ -204,6 +239,10 @@
     <div class="footer">
         <button class="action-btn" id="bottomFinishBtn">Lido & Próxima</button>
     </div>
+
+    <button id="ttsFab" class="fab-control" title="Pausar/Continuar Leitura">
+        ⏸️
+    </button>
 
     <script src="reading.js"></script>
 </body>

@@ -2,29 +2,49 @@
 chrome.commands.onCommand.addListener((command) => {
     console.log(`Command received: ${command}`);
 
-    // Check if we have an active Alura tab
+    let msgType = '';
+    if (command === 'next-lesson') msgType = 'COMMAND_NEXT';
+    if (command === 'play-pause') msgType = 'COMMAND_PLAY_PAUSE';
+    if (command === 'cycle-speed') msgType = 'COMMAND_CYCLE_SPEED';
+
+    if (!msgType) return;
+
+    // 1. Try sending to Reading Window (Popup) first
+    if (readingWindowId !== null) {
+        chrome.windows.get(readingWindowId, (win) => {
+            if (chrome.runtime.lastError || !win) {
+                // Window closed/invalid
+                readingWindowId = null;
+                sendToActiveTab(msgType);
+            } else {
+                // Window exists, send to its tabs
+                chrome.tabs.query({ windowId: readingWindowId }, (tabs) => {
+                    if (tabs && tabs.length > 0) {
+                        chrome.tabs.sendMessage(tabs[0].id, { type: msgType });
+                        console.log("Command routed to Reading Popup");
+                    }
+                });
+            }
+        });
+    } else {
+        // 2. Fallback to Active Tab
+        sendToActiveTab(msgType);
+    }
+});
+
+function sendToActiveTab(msgType) {
     chrome.tabs.query({ url: "*://*.alura.com.br/*" }, (tabs) => {
         if (tabs && tabs.length > 0) {
-            // Find the active one, or just the first one
-            // We prioritize the 'active' one in the current window if possible
             let targetTab = tabs.find(t => t.active && t.lastAccessed);
-
-            // If no active Alura tab, just take the first one found
             if (!targetTab) targetTab = tabs[0];
 
             if (targetTab) {
-                let msgType = '';
-                if (command === 'next-lesson') msgType = 'COMMAND_NEXT';
-                if (command === 'play-pause') msgType = 'COMMAND_PLAY_PAUSE';
-                if (command === 'cycle-speed') msgType = 'COMMAND_CYCLE_SPEED';
-
-                if (msgType) {
-                    chrome.tabs.sendMessage(targetTab.id, { type: msgType });
-                }
+                chrome.tabs.sendMessage(targetTab.id, { type: msgType });
+                console.log("Command routed to Alura Tab");
             }
         }
     });
-});
+}
 
 // Listener for Window Management (Restored)
 let quizWindowId = null;
