@@ -160,6 +160,27 @@
             /* Removemos a borda dura */
         }
     </style>
+    <style>
+        /* Classe para o parágrafo sendo lido */
+        .reading-active {
+            background-color: rgba(42, 122, 228, 0.15);
+            /* Azul Alura bem suave */
+            border-left: 4px solid var(--accent-color);
+            padding-left: 8px;
+            /* Compensa a borda para não mexer o texto */
+            margin-left: -12px;
+            /* Expande um pouco para a esquerda */
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+
+        /* Ajuste para Dark Mode */
+        @media (prefers-color-scheme: dark) {
+            .reading-active {
+                background-color: rgba(92, 164, 255, 0.15);
+            }
+        }
+    </style>
 </head>
 
 <body>
