@@ -4,18 +4,35 @@
 <head>
   <meta charset="UTF-8">
   <style>
+    :root {
+      --bg-color: #f4f4f9;
+      --text-color: #333;
+      --accent-color: #2A7AE4;
+      --subtext-color: #555;
+      --border-color: #ddd;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-color: #202023;
+        --text-color: #e0e0e0;
+        --accent-color: #5CA4FF;
+        --subtext-color: #bbb;
+        --border-color: #444;
+      }
+    }
+
     body {
       width: 250px;
       padding: 15px;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: #f4f4f9;
-      color: #333;
+      background-color: var(--bg-color);
+      color: var(--text-color);
     }
 
     h3 {
       margin-top: 0;
-      color: #2A7AE4;
-      /* Alura Blue */
+      color: var(--accent-color);
       text-align: center;
     }
 
@@ -38,20 +55,25 @@
     .value-display {
       font-size: 1.2em;
       font-weight: bold;
-      color: #555;
+      color: var(--subtext-color);
     }
 
     .footer {
       font-size: 0.8em;
       text-align: center;
-      color: #888;
+      color: var(--subtext-color);
       margin-top: 20px;
+    }
+
+    /* Melhoria visual para separador no modo escuro */
+    .separator {
+      border-top: 1px solid var(--border-color);
     }
   </style>
 </head>
 
 <body>
-  <h3>Lazy Alura</h3>
+  <h3>Alura Flow</h3>
 
   <div class="control-group">
     <label for="speedSlider">Velocidade de reprodução</label>
@@ -64,8 +86,7 @@
     <label for="autoAdvanceToggle" style="display: inline; font-weight: normal;">Habilitar auto-avançar</label>
   </div>
 
-  <div class="control-group"
-    style="text-align: left; margin-left: 10px; border-top: 1px solid #ddd; padding-top: 10px;">
+  <div class="control-group separator" style="text-align: left; margin-left: 10px; padding-top: 10px;">
     <input type="checkbox" id="shortcutsToggle">
     <label for="shortcutsToggle" style="display: inline; font-weight: bold;">Habilitar atalhos</label>
 

@@ -4,22 +4,71 @@
 <head>
     <meta charset="UTF-8">
     <style>
+        :root {
+            --bg-color: #fcfcfc;
+            --text-color: #333;
+            --accent-color: #2A7AE4;
+            --subtext-color: #666;
+            --border-color: #eee;
+
+            /* Cores dos Botões (Claro) */
+            --opt-bg: white;
+            --opt-border: #ddd;
+            --opt-hover-bg: #f0f7ff;
+
+            /* Estados (Claro) */
+            --selected-bg: #e6f1ff;
+            --selected-border: #2A7AE4;
+
+            --correct-bg: #f0fffc;
+            --correct-border: #00c4a7;
+
+            --wrong-bg: #ffe6e6;
+            --wrong-border: #e42a2a;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-color: #1e1e1e;
+                --text-color: #e0e0e0;
+                --accent-color: #5CA4FF;
+                --subtext-color: #aaa;
+                --border-color: #333;
+
+                /* Cores dos Botões (Escuro) */
+                --opt-bg: #2d2d2d;
+                --opt-border: #444;
+                --opt-hover-bg: #3a3a3a;
+
+                /* Estados (Escuro) - Usando transparência para ficar suave */
+                --selected-bg: rgba(42, 122, 228, 0.2);
+                --selected-border: #5CA4FF;
+
+                --correct-bg: rgba(0, 196, 167, 0.15);
+                --correct-border: #00c4a7;
+
+                --wrong-bg: rgba(228, 42, 42, 0.2);
+                --wrong-border: #ff5f5f;
+            }
+        }
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             padding: 20px;
-            background-color: #fcfcfc;
-            color: #333;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: background-color 0.3s;
         }
 
         h2 {
             font-size: 1.1em;
             margin-bottom: 5px;
-            color: #333;
+            color: var(--text-color);
         }
 
         .label-text {
             font-weight: bold;
-            color: #2A7AE4;
+            color: var(--accent-color);
             display: block;
             margin-bottom: 5px;
             text-transform: uppercase;
@@ -30,13 +79,13 @@
         .options-header-group {
             margin-top: 20px;
             margin-bottom: 10px;
-            border-bottom: 1px solid #eee;
+            border-bottom: 1px solid var(--border-color);
             padding-bottom: 5px;
         }
 
         .small-hint {
             font-size: 0.75em;
-            color: #666;
+            color: var(--subtext-color);
             font-weight: normal;
             margin-left: 5px;
         }
@@ -48,8 +97,9 @@
         }
 
         .option-btn {
-            background: white;
-            border: 1px solid #ddd;
+            background: var(--opt-bg);
+            border: 1px solid var(--opt-border);
+            color: var(--text-color);
             padding: 12px;
             border-radius: 6px;
             text-align: left;
@@ -64,36 +114,37 @@
             font-weight: bold;
             margin-right: 8px;
             min-width: 20px;
+            color: var(--accent-color);
         }
 
         .option-btn:hover {
-            border-color: #2A7AE4;
-            background-color: #f0f7ff;
+            border-color: var(--accent-color);
+            background-color: var(--opt-hover-bg);
         }
 
+        /* Sugestão visual (Highlight sutil) */
         .option-btn.correct {
-            border-left: 5px solid #00c4a7;
-            /* Distinct marker for suggestion */
-            background-color: #f0fffc;
+            border-left: 5px solid var(--correct-border);
+            background-color: var(--correct-bg);
         }
 
         .option-btn.selected {
-            border-color: #2A7AE4;
-            background-color: #e6f1ff;
-            box-shadow: 0 0 0 1px #2A7AE4;
+            border-color: var(--selected-border);
+            background-color: var(--selected-bg);
+            box-shadow: 0 0 0 1px var(--selected-border);
         }
 
         .option-btn.wrong {
-            border-color: #e42a2a;
-            background-color: #ffe6e6;
-            box-shadow: 0 0 0 1px #e42a2a;
+            border-color: var(--wrong-border);
+            background-color: var(--wrong-bg);
+            box-shadow: 0 0 0 1px var(--wrong-border);
             animation: shake 0.3s;
         }
 
         .option-btn.reveal-correct {
-            border-color: #00c4a7;
-            background-color: #f0fffc;
-            box-shadow: 0 0 5px #00c4a7;
+            border-color: var(--correct-border);
+            background-color: var(--correct-bg);
+            box-shadow: 0 0 5px var(--correct-border);
             animation: pulse-green 1.5s infinite;
         }
 
@@ -101,22 +152,44 @@
             display: block;
             margin-top: 5px;
             font-size: 0.85em;
-            color: #666;
+            color: var(--subtext-color);
             font-style: italic;
         }
 
         @keyframes shake {
-            0% { transform: translateX(0); }
-            25% { transform: translateX(-5px); }
-            50% { transform: translateX(5px); }
-            75% { transform: translateX(-5px); }
-            100% { transform: translateX(0); }
+            0% {
+                transform: translateX(0);
+            }
+
+            25% {
+                transform: translateX(-5px);
+            }
+
+            50% {
+                transform: translateX(5px);
+            }
+
+            75% {
+                transform: translateX(-5px);
+            }
+
+            100% {
+                transform: translateX(0);
+            }
         }
 
         @keyframes pulse-green {
-            0% { box-shadow: 0 0 0 0 rgba(0, 196, 167, 0.4); }
-            70% { box-shadow: 0 0 0 10px rgba(0, 196, 167, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(0, 196, 167, 0); }
+            0% {
+                box-shadow: 0 0 0 0 rgba(0, 196, 167, 0.4);
+            }
+
+            70% {
+                box-shadow: 0 0 0 10px rgba(0, 196, 167, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(0, 196, 167, 0);
+            }
         }
     </style>
 </head>
