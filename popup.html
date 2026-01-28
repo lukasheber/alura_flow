@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body {
+      width: 250px;
+      padding: 15px;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f4f4f9;
+      color: #333;
+    }
+
+    h3 {
+      margin-top: 0;
+      color: #2A7AE4;
+      /* Alura Blue */
+      text-align: center;
+    }
+
+    .control-group {
+      margin-bottom: 15px;
+      text-align: center;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+
+    input[type=range] {
+      width: 100%;
+      cursor: pointer;
+    }
+
+    .value-display {
+      font-size: 1.2em;
+      font-weight: bold;
+      color: #555;
+    }
+
+    .footer {
+      font-size: 0.8em;
+      text-align: center;
+      color: #888;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+
+<body>
+  <h3>Lazy Alura</h3>
+
+  <div class="control-group">
+    <label for="speedSlider">Velocidade de reprodução</label>
+    <div class="value-display" id="speedValue">1.0x</div>
+    <input type="range" id="speedSlider" min="0.5" max="4.0" step="0.25" value="1.0">
+  </div>
+
+  <div class="control-group" style="text-align: left; margin-left: 10px;">
+    <input type="checkbox" id="autoAdvanceToggle" checked>
+    <label for="autoAdvanceToggle" style="display: inline; font-weight: normal;">Habilitar auto-avançar</label>
+  </div>
+
+  <div class="control-group"
+    style="text-align: left; margin-left: 10px; border-top: 1px solid #ddd; padding-top: 10px;">
+    <input type="checkbox" id="shortcutsToggle">
+    <label for="shortcutsToggle" style="display: inline; font-weight: bold;">Habilitar atalhos</label>
+
+    <div style="font-size: 0.85em; color: #666; margin-top: 5px; margin-left: 20px;">
+      <div><b>Ctrl+Alt+N</b>: Proxima lição</div>
+      <div><b>Ctrl+Alt+P</b>: Play/Pausar</div>
+      <div><b>Ctrl+Alt+S</b>: Alterar velocidade</div>
+    </div>
+  </div>
+
+
+  <script src="popup.js"></script>
+</body>
+
+</html>

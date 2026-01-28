@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 20px;
+            background-color: #fcfcfc;
+            color: #333;
+        }
+
+        h2 {
+            font-size: 1.1em;
+            margin-bottom: 5px;
+            color: #333;
+        }
+
+        .label-text {
+            font-weight: bold;
+            color: #2A7AE4;
+            display: block;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            font-size: 0.8em;
+            letter-spacing: 0.5px;
+        }
+
+        .options-header-group {
+            margin-top: 20px;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+        }
+
+        .small-hint {
+            font-size: 0.75em;
+            color: #666;
+            font-weight: normal;
+            margin-left: 5px;
+        }
+
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .option-btn {
+            background: white;
+            border: 1px solid #ddd;
+            padding: 12px;
+            border-radius: 6px;
+            text-align: left;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.95em;
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .option-index {
+            font-weight: bold;
+            margin-right: 8px;
+            min-width: 20px;
+        }
+
+        .option-btn:hover {
+            border-color: #2A7AE4;
+            background-color: #f0f7ff;
+        }
+
+        .option-btn.correct {
+            border-left: 5px solid #00c4a7;
+            /* Distinct marker for suggestion */
+            background-color: #f0fffc;
+        }
+
+        .option-btn.selected {
+            border-color: #2A7AE4;
+            background-color: #e6f1ff;
+            box-shadow: 0 0 0 1px #2A7AE4;
+        }
+
+        .option-btn.wrong {
+            border-color: #e42a2a;
+            background-color: #ffe6e6;
+            box-shadow: 0 0 0 1px #e42a2a;
+            animation: shake 0.3s;
+        }
+
+        .option-btn.reveal-correct {
+            border-color: #00c4a7;
+            background-color: #f0fffc;
+            box-shadow: 0 0 5px #00c4a7;
+            animation: pulse-green 1.5s infinite;
+        }
+
+        .opinion-text {
+            display: block;
+            margin-top: 5px;
+            font-size: 0.85em;
+            color: #666;
+            font-style: italic;
+        }
+
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            50% { transform: translateX(5px); }
+            75% { transform: translateX(-5px); }
+            100% { transform: translateX(0); }
+        }
+
+        @keyframes pulse-green {
+            0% { box-shadow: 0 0 0 0 rgba(0, 196, 167, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(0, 196, 167, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(0, 196, 167, 0); }
+        }
+    </style>
+</head>
+
+<body>
+    <span class="label-text">Questão</span>
+    <h2 id="question">Loading...</h2>
+
+    <div class="options-header-group">
+        <span class="label-text" style="display:inline;">Opções:</span>
+        <span id="options-hint" class="small-hint">(opções sugeridas destacadas)</span>
+    </div>
+
+    <div id="options" class="options"></div>
+
+    <script src="quiz.js"></script>
+</body>
+
+</html>

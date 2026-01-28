@@ -1,0 +1,67 @@
+{
+  "manifest_version": 3,
+  "name": "Alura Flow",
+  "version": "1.0",
+  "description": "Transforme cursos em podcasts e mantenha o foco.",
+  "permissions": [
+    "activeTab",
+    "storage"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "commands": {
+    "next-lesson": {
+      "suggested_key": {
+        "default": "Ctrl+Alt+N",
+        "mac": "Command+Alt+N"
+      },
+      "description": "Go to Next Lesson"
+    },
+    "play-pause": {
+      "suggested_key": {
+        "default": "Ctrl+Alt+P",
+        "mac": "Command+Alt+P"
+      },
+      "description": "Play/Pause Video"
+    },
+    "cycle-speed": {
+      "suggested_key": {
+        "default": "Ctrl+Alt+S",
+        "mac": "Command+Alt+S"
+      },
+      "description": "Cycle Playback Speed"
+    }
+  },
+  "background": {
+    "scripts": [
+      "background.js"
+    ]
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.alura.com.br/*"
+      ],
+      "js": [
+        "content.js"
+      ]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "quiz.html",
+        "reading.html"
+      ],
+      "matches": [
+        "*://*.alura.com.br/*"
+      ]
+    }
+  ]
+}
