@@ -6,7 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentSpeed = 1.0;
 
     // Load saved settings
-    chrome.storage.local.get(['playbackSpeed', 'autoAdvanceEnabled', 'shortcutsEnabled', 'autoReadEnabled'], (result) => {
+    chrome.storage.local.get(['playbackSpeed', 'autoAdvanceEnabled', 'shortcutsEnabled', 'autoReadEnabled', 'autoMinimizeEnabled'], (result) => {
         if (result.playbackSpeed) {
             currentSpeed = result.playbackSpeed;
             updateUI(currentSpeed);
@@ -30,6 +30,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (result.autoReadEnabled !== undefined) {
             const arToggle = document.getElementById('autoReadToggle');
             if (arToggle) arToggle.checked = result.autoReadEnabled;
+        }
+
+        // Auto Minimize Toggle
+        if (result.autoMinimizeEnabled !== undefined) {
+            const minToggle = document.getElementById('minimizeToggle');
+            if (minToggle) minToggle.checked = result.autoMinimizeEnabled;
         }
     });
 
@@ -98,6 +104,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const isEnabled = e.target.checked;
             chrome.storage.local.set({ autoReadEnabled: isEnabled });
             console.log("Auto-Read toggled:", isEnabled);
+        });
+    }
+
+    // Auto Minimize Toggle
+    const minToggle = document.getElementById('minimizeToggle');
+    if (minToggle) {
+        minToggle.addEventListener('change', (e) => {
+            const isEnabled = e.target.checked;
+            chrome.storage.local.set({ autoMinimizeEnabled: isEnabled });
+            console.log("Auto-Minimize toggled:", isEnabled);
         });
     }
 });

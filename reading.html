@@ -8,23 +8,47 @@
             --bg-color: #fcfcfc;
             --text-color: #333;
             --header-bg: rgba(252, 252, 252, 0.95);
-            /* Levemente transparente */
             --accent-color: #2A7AE4;
             --accent-hover: #0c5abb;
             --btn-text: white;
             --border-color: #eee;
+            --subtext-color: #666;
+
+            /* Quiz Colors */
+            --hint-bg: #f7f7f7;
+            --opt-bg: white;
+            --opt-border: #ddd;
+            --opt-hover-bg: #f0f7ff;
+            --selected-bg: #e6f1ff;
+            --selected-border: #2A7AE4;
+            --correct-bg: #f0fffc;
+            --correct-border: #00c4a7;
+            --wrong-bg: #ffe6e6;
+            --wrong-border: #e42a2a;
         }
 
         @media (prefers-color-scheme: dark) {
             :root {
                 --bg-color: #1e1e1e;
                 --text-color: #d4d4d4;
-                /* Cinza mais suave para leitura longa */
                 --header-bg: rgba(30, 30, 30, 0.95);
                 --accent-color: #3d8bfd;
                 --accent-hover: #5CA4FF;
                 --btn-text: #1e1e1e;
                 --border-color: #333;
+                --subtext-color: #aaa;
+
+                /* Quiz Colors Dark */
+                --hint-bg: #252526;
+                --opt-bg: #2d2d2d;
+                --opt-border: #444;
+                --opt-hover-bg: #3a3a3a;
+                --selected-bg: rgba(42, 122, 228, 0.2);
+                --selected-border: #5CA4FF;
+                --correct-bg: rgba(0, 196, 167, 0.15);
+                --correct-border: #00c4a7;
+                --wrong-bg: rgba(228, 42, 42, 0.2);
+                --wrong-border: #ff5f5f;
             }
 
             img {
@@ -34,154 +58,333 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            padding: 0 20px 20px 20px;
-            /* Padding ajustado */
+            padding: 0;
             background-color: var(--bg-color);
             color: var(--text-color);
             line-height: 1.6;
             margin: 0;
+            overflow-x: hidden;
         }
 
-        /* --- Header Minimalista --- */
-        .header {
-            position: relative;
+        /* --- Header --- */
+        .global-header {
+            position: sticky;
             top: 0;
             background: var(--header-bg);
-            padding: 10px 0;
+            padding: 10px 20px;
             border-bottom: 1px solid var(--border-color);
-            margin-bottom: 20px;
             z-index: 100;
             display: flex;
             justify-content: space-between;
             align-items: center;
             backdrop-filter: blur(5px);
-            /* Efeito moderno suave */
+            height: 40px;
         }
 
-        /* Título do Header Pequeno e Discreto */
-        .header h2 {
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #connectionLed {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #ccc;
+            transition: background-color 0.3s;
+        }
+
+        #connectionLed.led-active {
+            background-color: #00c4a7;
+            box-shadow: 0 0 5px #00c4a7;
+        }
+
+        #mainTitle {
             margin: 0;
             color: var(--accent-color);
-            font-size: 0.95rem;
-            /* Bem menor, como uma label */
+            font-size: 0.9rem;
             text-transform: uppercase;
             letter-spacing: 0.5px;
             font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 300px;
         }
 
-        /* --- Conteúdo Limpo (Normalização) --- */
-        .content {
+        /* --- View Containers --- */
+        .mode-view {
+            padding: 20px;
+            opacity: 1;
+            transition: opacity 0.3s ease;
+        }
+
+        .mode-view.hidden {
+            display: none;
+            opacity: 0;
+        }
+
+        /* --- PLAYER VIEW --- */
+        #view-player {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 400px;
+            /* Approximate center height */
+            text-align: center;
+        }
+
+        .video-placeholder {
+            margin-bottom: 30px;
+            color: var(--subtext-color);
+        }
+
+        .video-placeholder .icon {
+            font-size: 3rem;
+            display: block;
+            margin-bottom: 10px;
+            opacity: 0.5;
+        }
+
+        .controls-wrapper {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .ctrl-btn {
+            background: none;
+            border: 2px solid var(--border-color);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            color: var(--text-color);
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .ctrl-btn:hover {
+            border-color: var(--accent-color);
+            color: var(--accent-color);
+            transform: scale(1.05);
+        }
+
+        .speed-controls {
+            display: flex;
+            gap: 5px;
+            background: var(--hint-bg);
+            padding: 5px;
+            border-radius: 20px;
+        }
+
+        .speed-btn {
+            background: none;
+            border: none;
+            padding: 5px 12px;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            color: var(--subtext-color);
+            transition: all 0.2s;
+        }
+
+        .speed-btn.active,
+        .speed-btn:hover {
+            background-color: var(--bg-color);
+            color: var(--accent-color);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        /* --- CONTENT VIEW (Text & Quiz) --- */
+        .content-container {
             font-size: 1rem;
         }
 
-        /* Força bruta para domar o HTML da Alura */
-        .content h1,
-        .content h2,
-        .content h3 {
+        /* Styles shared with old reading.html */
+        .content-container h1,
+        .content-container h2,
+        .content-container h3 {
             font-size: 1.15em !important;
-            /* Nada gigante */
             margin-top: 1.5em;
             margin-bottom: 0.5em;
             color: var(--text-color);
             font-weight: 600;
-            line-height: 1.3;
         }
 
-        .content strong {
-            color: var(--text-color);
-            /* Evita cores estranhas */
-            font-weight: 700;
-        }
-
-        /* Parágrafos com respiro */
-        .content p {
-            margin-bottom: 1.2em;
-            text-align: justify;
-            /* Opcional: fica mais organizado visualmente */
-        }
-
-        /* Imagens contidas */
-        img {
+        .content-container img {
             max-width: 100%;
             height: auto;
-            display: block;
+            border-radius: 4px;
             margin: 15px auto;
+            display: block;
+        }
+
+        .reading-active {
+            background-color: rgba(42, 122, 228, 0.15);
+            border-left: 4px solid var(--accent-color);
+            padding-left: 8px;
+            margin-left: -12px;
             border-radius: 4px;
         }
 
-        /* --- Botões e Footer Não-Sticky --- */
+        /* --- QUIZ STYLES (Merged from quiz.html) --- */
+        #quizContainer h2#quizQuestion {
+            font-size: 1rem;
+            font-weight: 400;
+            /* Fixed: Was 500/Bold */
+            margin-bottom: 5px;
+            color: var(--text-color);
+            line-height: 1.5;
+        }
+
+        #quizInstruction {
+            font-size: 0.9rem;
+            color: var(--subtext-color);
+            margin-bottom: 20px;
+            font-style: italic;
+        }
+
+        .options-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        .option-btn {
+            background: var(--opt-bg);
+            border: 1px solid var(--opt-border);
+            color: var(--text-color);
+            padding: 12px 15px;
+            border-radius: 8px;
+            text-align: left;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            font-size: 0.95em;
+        }
+
+        .option-btn:hover {
+            border-color: var(--accent-color);
+            background-color: var(--opt-hover-bg);
+        }
+
+        .option-btn.selected {
+            border-color: var(--selected-border);
+            background-color: var(--selected-bg);
+            box-shadow: 0 0 0 1px var(--selected-border);
+        }
+
+        .option-btn.correct {
+            border-left: 5px solid var(--correct-border);
+            background-color: var(--correct-bg);
+        }
+
+        .option-btn.wrong {
+            border-color: var(--wrong-border);
+            background-color: var(--wrong-bg);
+            animation: shake 0.3s;
+        }
+
+        .option-btn.reveal-correct {
+            border-color: var(--correct-border);
+            background-color: var(--correct-bg);
+            box-shadow: 0 0 5px var(--correct-border);
+            animation: pulse-green 1.5s infinite;
+        }
+
+        .opt-main-row {
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .option-index {
+            font-weight: bold;
+            margin-right: 12px;
+            color: var(--accent-color);
+            min-width: 20px;
+        }
+
+        /* Spoilers */
+        .opt-hint-row {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px dashed var(--border-color);
+            font-size: 0.85em;
+            width: 100%;
+        }
+
+        .opt-hint-row.active {
+            background-color: var(--hint-bg);
+            margin: -12px -15px -12px -15px;
+            /* Expand to edges */
+            padding: 8px 15px;
+            border-top: 1px solid var(--border-color);
+            border-bottom-left-radius: 8px;
+            border-bottom-right-radius: 8px;
+            margin-top: 8px;
+        }
+
+        .hint-toggle {
+            color: var(--accent-color);
+            cursor: pointer;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .hint-content {
+            margin-top: 8px;
+            color: var(--subtext-color);
+            font-style: italic;
+            border-left: 2px solid var(--accent-color);
+            padding-left: 5px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* --- Actions Footer --- */
+        .reading-actions {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+        }
+
         .action-btn {
             background-color: transparent;
             color: var(--accent-color);
             border: 1px solid var(--accent-color);
-            padding: 6px 12px;
+            padding: 8px 16px;
             border-radius: 4px;
             cursor: pointer;
             font-weight: 600;
-            font-size: 0.8em;
-            transition: all 0.2s;
         }
 
-        .action-btn:hover {
+        .action-btn.primary {
             background-color: var(--accent-color);
             color: var(--btn-text);
         }
 
-        /* O botão de cima pode ser o destaque sólido */
-        #topFinishBtn {
-            background-color: var(--accent-color);
-            color: var(--btn-text);
-        }
-
-        .footer {
-            margin-top: 40px;
-            padding-top: 20px;
-            border-top: 1px solid var(--border-color);
-            text-align: right;
-            /* O botão vai fluir com o texto */
-        }
-
-        #bottomFinishBtn {
-            /* Botão final maior para facilitar o clique ao terminar */
-            padding: 10px 20px;
-            font-size: 0.9em;
-            width: 100%;
-            /* Botão largo no final fica bom em mobile/popup */
-        }
-
-        /* Seção de Opinião */
         #opinionSection {
             background-color: rgba(127, 127, 127, 0.05);
-            /* Fundo sutil */
             padding: 15px;
             border-radius: 6px;
             margin-top: 30px;
-            border: none !important;
-            /* Removemos a borda dura */
-        }
-    </style>
-    <style>
-        /* Classe para o parágrafo sendo lido */
-        .reading-active {
-            background-color: rgba(42, 122, 228, 0.15);
-            /* Azul Alura bem suave */
-            border-left: 4px solid var(--accent-color);
-            padding-left: 8px;
-            /* Compensa a borda para não mexer o texto */
-            margin-left: -12px;
-            /* Expande um pouco para a esquerda */
-            border-radius: 4px;
-            transition: all 0.3s ease;
         }
 
-        /* Ajuste para Dark Mode */
-        @media (prefers-color-scheme: dark) {
-            .reading-active {
-                background-color: rgba(92, 164, 255, 0.15);
-            }
-        }
-
-        /* Botão Flutuante de Controle TTS */
+        /* FAB */
         .fab-control {
             position: fixed;
             bottom: 20px;
@@ -199,50 +402,134 @@
             justify-content: center;
             font-size: 24px;
             z-index: 1000;
-            transition: transform 0.2s, opacity 0.3s;
             opacity: 0;
-            /* Escondido por padrão */
             pointer-events: none;
-            /* Não clica quando invisível */
+            transition: all 0.3s;
         }
 
         .fab-control.visible {
             opacity: 1;
             pointer-events: auto;
-            transform: scale(1);
         }
 
-        .fab-control:active {
-            transform: scale(0.95);
+        @keyframes shake {
+
+            0%,
+            100% {
+                transform: translateX(0);
+            }
+
+            25%,
+            75% {
+                transform: translateX(-5px);
+            }
+
+            50% {
+                transform: translateX(5px);
+            }
+        }
+
+
+        @keyframes pulse-green {
+            0% {
+                box-shadow: 0 0 0 0 rgba(0, 196, 167, 0.4);
+            }
+
+            70% {
+                box-shadow: 0 0 0 10px rgba(0, 196, 167, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(0, 196, 167, 0);
+            }
+        }
+
+        /* --- New Top Controls --- */
+        .reading-actions-top {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px dashed var(--border-color);
+        }
+
+        .reading-actions-top .action-btn {
+            font-size: 0.9em;
+            padding: 6px 12px;
+        }
+
+        /* --- Fix Overlap & Spacing --- */
+        #view-content {
+            padding-top: 30px;
+            /* Give some air from the fixed header */
+            padding-bottom: 80px;
+            /* Ensure bottom content isn't covered by Fab or obscured */
+        }
+
+        div#textContainer {
+            margin-top: 10px;
         }
     </style>
 </head>
 
 <body>
-    <div class="header">
-        <h2 id="readingTitle">Reading Activity</h2>
-        <div style="display: flex; gap: 10px;">
-            <button class="action-btn" id="ttsBtn" title="Ouvir texto">🔊 Ouvir</button>
-            <button class="action-btn" id="topFinishBtn">Lido & Próxima</button>
+    <header class="global-header">
+        <div class="header-left">
+            <div id="connectionLed" class="led-active" title="Conectado à Alura"></div>
+            <h1 id="mainTitle">Carregando...</h1>
         </div>
-    </div>
+        <!-- Right side tools (optional) -->
+    </header>
 
-    <div class="content" id="readingContent">
-        Loading content...
-    </div>
+    <!-- PLAYER MODE -->
+    <section id="view-player" class="mode-view hidden">
+        <div class="video-placeholder">
+            <span class="icon">🎬</span>
+            <span id="videoStatusText">Reproduzindo vídeo...</span>
+        </div>
+        <div class="controls-wrapper">
+            <button id="remotePrev" class="ctrl-btn" title="Anterior">⏮️</button>
+            <button id="remotePlay" class="ctrl-btn" title="Play/Pause">⏯️</button>
+            <button id="remoteNext" class="ctrl-btn" title="Próxima">⏭️</button>
+        </div>
+        <div class="speed-controls">
+            <button class="speed-btn" data-speed="1.0">1x</button>
+            <button class="speed-btn" data-speed="1.25">1.25x</button>
+            <button class="speed-btn" data-speed="1.5">1.5x</button>
+            <button class="speed-btn" data-speed="2.0">2x</button>
+        </div>
+    </section>
 
-    <div id="opinionSection" style="display: none; margin-top: 30px; border-top: 1px solid #ddd; padding-top: 20px;">
-        <h3 style="color: #2A7AE4; margin-bottom: 10px;">Opinião do Instrutor</h3>
-        <div id="opinionContent" class="content"></div>
-    </div>
+    <!-- CONTENT MODE (Text or Quiz) -->
+    <section id="view-content" class="mode-view hidden">
+        <!-- Text Content Area -->
+        <div id="textContainer">
+            <div class="reading-actions-top">
+                <button id="ttsBtnTop" class="action-btn">🔊 Ouvir</button>
+                <button id="finishBtnTop" class="action-btn primary">Lido & Próxima</button>
+            </div>
+            <div id="dynamicContent" class="content-container"></div>
+            <div id="opinionSection" class="hidden">
+                <h3 style="color: var(--accent-color); margin-bottom: 10px;">Opinião do Instrutor</h3>
+                <div id="opinionContent" class="content-container"></div>
+            </div>
+        </div>
 
-    <div class="footer">
-        <button class="action-btn" id="bottomFinishBtn">Lido & Próxima</button>
-    </div>
+        <!-- Quiz Content Area -->
+        <div id="quizContainer" class="hidden">
+            <h2 id="quizQuestion">Loading...</h2>
+            <p id="quizInstruction" class="hidden"></p>
+            <div id="quizOptions" class="options-list"></div>
+        </div>
 
-    <button id="ttsFab" class="fab-control" title="Pausar/Continuar Leitura">
-        ⏸️
-    </button>
+        <div class="reading-actions">
+            <button id="ttsBtn" class="action-btn">🔊 Ouvir</button>
+            <button id="finishBtn" class="action-btn primary">Lido & Próxima</button>
+        </div>
+    </section>
+
+    <button id="ttsFab" class="fab-control">⏯️</button>
 
     <script src="reading.js"></script>
 </body>
