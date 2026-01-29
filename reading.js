@@ -70,6 +70,15 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // --- RENDER FUNCTIONS ---
+    function setSafeHTML(element, html) {
+        if (!element) return;
+        element.innerHTML = '';
+        if (!html) return;
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        Array.from(doc.body.childNodes).forEach(node => element.appendChild(node));
+    }
+
     function renderText(data) {
         textContainer.classList.remove('hidden');
         quizContainer.classList.add('hidden');
@@ -98,14 +107,14 @@ document.addEventListener('DOMContentLoaded', () => {
         // Prevent scroll reset if content is identical
         const newHtml = data.html || "";
         if (dynamicContent.innerHTML !== newHtml) {
-            dynamicContent.innerHTML = newHtml;
+            setSafeHTML(dynamicContent, newHtml);
             contentChanged = true;
         }
 
         // Opinion
         if (data.opinionHtml) {
             if (opinionContent.innerHTML !== data.opinionHtml) {
-                opinionContent.innerHTML = data.opinionHtml;
+                setSafeHTML(opinionContent, data.opinionHtml);
                 contentChanged = true;
             }
             opinionSection.classList.remove('hidden');
@@ -158,12 +167,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (finishBtnTop) finishBtnTop.classList.add('hidden');
         mainTitle.textContent = "Quiz"; // Or keep lesson title if available
 
-        document.getElementById('quizQuestion').innerHTML = data.questionHTML || "Pergunta";
+        setSafeHTML(document.getElementById('quizQuestion'), data.questionHTML || "Pergunta");
 
         // Render Instruction (e.g. "Select 1 option")
         const instructionEl = document.getElementById('quizInstruction');
         if (instructionEl) {
-            instructionEl.innerHTML = data.instructionHTML || "";
+            setSafeHTML(instructionEl, data.instructionHTML || "");
             if (data.instructionHTML) instructionEl.classList.remove('hidden');
             else instructionEl.classList.add('hidden');
         }
@@ -208,7 +217,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 `;
             }
 
-            btn.innerHTML = html + hintHtml;
+            setSafeHTML(btn, html + hintHtml);
             optionsList.appendChild(btn);
 
             // Bind Events
@@ -222,10 +231,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     const isHidden = content.classList.toggle('hidden');
 
                     if (isHidden) {
-                        toggle.innerHTML = '<span style="font-size: 1.1em">🗨️</span> Ver dica';
+                        setSafeHTML(toggle, '<span style="font-size: 1.1em">🗨️</span> Ver dica');
                         row.classList.remove('active');
                     } else {
-                        toggle.innerHTML = '❌ Esconder dica';
+                        toggle.textContent = '❌ Esconder dica';
                         row.classList.add('active');
                     }
                 });

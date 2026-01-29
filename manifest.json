@@ -5,8 +5,20 @@
   "description": "Transforme cursos em podcasts e mantenha o foco.",
   "permissions": [
     "activeTab",
-    "storage"
+    "storage",
+    "tabs"
   ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "aluraflow@aluraflow.com",
+      "strict_min_version": "140.0",
+      "data_collection_permissions": {
+        "required": [
+          "none"
+        ]
+      }
+    }
+  },
   "action": {
     "default_popup": "popup.html",
     "default_icon": {

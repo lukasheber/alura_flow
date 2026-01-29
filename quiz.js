@@ -1,7 +1,16 @@
 document.addEventListener('DOMContentLoaded', () => {
+    function setSafeHTML(element, html) {
+        if (!element) return;
+        element.innerHTML = '';
+        if (!html) return;
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        Array.from(doc.body.childNodes).forEach(node => element.appendChild(node));
+    }
+
     chrome.storage.local.get(['currentQuiz'], (result) => {
         if (result.currentQuiz) {
-            document.getElementById('question').innerHTML = result.currentQuiz.questionHTML;
+            setSafeHTML(document.getElementById('question'), result.currentQuiz.questionHTML);
 
             // 1. Hint Text Logic
             const hasSuggestions = result.currentQuiz.options.some(o => o.isCorrect);
@@ -50,7 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 indexSpan.textContent = letter;
 
                 const textSpan = document.createElement('span');
-                textSpan.innerHTML = opt.html;
+                setSafeHTML(textSpan, opt.html);
 
                 mainRow.appendChild(indexSpan);
                 mainRow.appendChild(textSpan);
@@ -75,7 +84,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (cleanHint.trim().startsWith('(') && cleanHint.trim().endsWith(')')) {
                         cleanHint = cleanHint.trim().substring(1, cleanHint.trim().length - 1);
                     }
-                    hintContent.innerHTML = cleanHint;
+                    setSafeHTML(hintContent, cleanHint);
 
                     // Click event ONLY on the trigger
                     toggleTrigger.onclick = (e) => {
@@ -84,10 +93,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
                         const isHidden = hintContent.classList.toggle('hidden');
                         if (isHidden) {
-                            toggleTrigger.innerHTML = '<span style="font-size: 1.1em">🗨️</span> Ver dica';
+                            setSafeHTML(toggleTrigger, '<span style="font-size: 1.1em">🗨️</span> Ver dica');
                             hintRow.classList.remove('active');
                         } else {
-                            toggleTrigger.innerHTML = '❌ Esconder dica';
+                            toggleTrigger.textContent = '❌ Esconder dica';
                             hintRow.classList.add('active');
                         }
                     };

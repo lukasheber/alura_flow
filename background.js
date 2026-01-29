@@ -6,26 +6,70 @@
 
 // --- WINDOW MANAGEMENT ---
 
+// --- WINDOW MANAGEMENT ---
+let isCreatingWindow = false;
+let creationQueue = [];
+
+function processCreationQueue(win) {
+    while (creationQueue.length > 0) {
+        const cb = creationQueue.shift();
+        if (cb) cb(win);
+    }
+}
+
 function getCompanionWindow(callback) {
+    // 1. Race Lock: If creating, wait.
+    if (isCreatingWindow) {
+        creationQueue.push(callback);
+        return;
+    }
+
     chrome.storage.session.get(['companionWindowId'], (result) => {
         const id = result.companionWindowId;
-        if (!id) {
-            callback(null);
-            return;
+        if (id) {
+            chrome.windows.get(id, (win) => {
+                if (chrome.runtime.lastError || !win) {
+                    // Window ID stale, try finding by matching URL/Type to handle reload orphans
+                    findOrphanedWindow((orphan) => {
+                        if (orphan) {
+                            chrome.storage.session.set({ companionWindowId: orphan.id });
+                            callback(orphan);
+                        } else {
+                            chrome.storage.session.remove('companionWindowId');
+                            callback(null);
+                        }
+                    });
+                } else {
+                    callback(win);
+                }
+            });
+        } else {
+            // No ID, but maybe an orphan exists?
+            findOrphanedWindow((orphan) => {
+                if (orphan) {
+                    chrome.storage.session.set({ companionWindowId: orphan.id });
+                    callback(orphan);
+                } else {
+                    callback(null);
+                }
+            });
         }
-        chrome.windows.get(id, (win) => {
-            if (chrome.runtime.lastError || !win) {
-                // Window gone, clear storage
-                chrome.storage.session.remove('companionWindowId');
-                callback(null);
-            } else {
-                callback(win);
-            }
-        });
+    });
+}
+
+function findOrphanedWindow(cb) {
+    // Removed specific windowTypes filter to be broader
+    // NEED "tabs" permission for this to see URLs of other windows effectively? Yes.
+    chrome.windows.getAll({ populate: true }, (wins) => {
+        const found = wins.find(w => w.tabs && w.tabs.some(t => t.url && t.url.includes('reading.html')));
+        cb(found || null);
     });
 }
 
 function createCompanionWindow(initialState = null) {
+    if (isCreatingWindow) return; // Should be handled by getCompanionWindow guard, but safety check.
+    isCreatingWindow = true;
+
     chrome.windows.create({
         url: 'reading.html',
         type: 'popup',
@@ -36,6 +80,10 @@ function createCompanionWindow(initialState = null) {
         const id = win.id;
         console.log("Companion Window Created:", id);
         chrome.storage.session.set({ companionWindowId: id });
+
+        // Unlock
+        isCreatingWindow = false;
+        processCreationQueue(win);
 
         // If we have initial state, send it after a short delay to ensure load
         if (initialState) {
@@ -234,15 +282,30 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 // 6. INSTALLATION / UPDATE
+// 6. INSTALLATION / UPDATE
 chrome.runtime.onInstalled.addListener((details) => {
     if (details.reason === 'install') {
-        chrome.storage.local.set({
-            playbackSpeed: 1.0,
-            autoAdvanceEnabled: true,
-            shortcutsEnabled: true,
-            autoReadEnabled: true,
-            autoMinimizeEnabled: true
+        // Only set defaults if not present (preserve settings on reload/update)
+        chrome.storage.local.get(['playbackSpeed', 'autoAdvanceEnabled', 'shortcutsEnabled', 'autoReadEnabled', 'autoMinimizeEnabled'], (current) => {
+            const defaults = {
+                playbackSpeed: 1.0,
+                autoAdvanceEnabled: true,
+                shortcutsEnabled: true,
+                autoReadEnabled: true,
+                autoMinimizeEnabled: true
+            };
+
+            const toSet = {};
+            for (const key in defaults) {
+                if (current[key] === undefined) {
+                    toSet[key] = defaults[key];
+                }
+            }
+
+            if (Object.keys(toSet).length > 0) {
+                chrome.storage.local.set(toSet);
+                console.log("Alura Flow: Default settings applied (missing keys only).");
+            }
         });
-        console.log("Alura Flow: Default settings applied.");
     }
 });
