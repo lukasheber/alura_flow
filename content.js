@@ -139,7 +139,14 @@ function attachVideoListeners(video) {
     });
 
     video.addEventListener('ratechange', () => {
-        // Apply persisted speed if needed
+        chrome.runtime.sendMessage({ type: 'SPEED_UPDATED', speed: video.playbackRate });
+    });
+
+    // Apply persisted speed immediately when attaching
+    chrome.storage.local.get(['playbackSpeed'], (res) => {
+        if (res.playbackSpeed) {
+            video.playbackRate = res.playbackSpeed;
+        }
     });
 
     video.addEventListener('ended', () => {
@@ -351,11 +358,8 @@ chrome.runtime.onMessage.addListener((msg) => {
             let nextIdx = (idx + 1) % speeds.length;
             video.playbackRate = speeds[nextIdx];
 
-            // Show toast or log?
             console.log("Video Speed cycled to:", video.playbackRate);
-
-            // Optionally sync storage if we want video to drive global speed
-            chrome.runtime.sendMessage({ type: 'UPDATE_SPEED', speed: speeds[nextIdx] });
+            // ratechange event will handle the broadcast
         }
     }
     if (msg.type === 'UPDATE_SPEED') {

@@ -116,4 +116,11 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log("Auto-Minimize toggled:", isEnabled);
         });
     }
+    // Listen for speed updates from other sources (shortcuts, video player)
+    chrome.runtime.onMessage.addListener((message) => {
+        if (message.type === 'SPEED_UPDATED') {
+            // Update UI only, do not trigger saveAndApplySpeed to avoid loop
+            updateUI(message.speed);
+        }
+    });
 });

@@ -471,42 +471,38 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        if (msg.type === 'COMMAND_CYCLE_SPEED') {
-            chrome.storage.local.get(['playbackSpeed'], (res) => {
-                const speeds = [1.0, 1.25, 1.5, 2.0];
-                let current = res.playbackSpeed || 1.2; // Fallback default
+        if (msg.type === 'SPEED_UPDATED') {
+            const speed = msg.speed;
+            const customBtn = document.getElementById('customSpeedBtn');
+            let isStandard = false;
 
-                // Find next speed
-                // Using imprecise matching finding closest
-                let idx = speeds.findIndex(s => Math.abs(s - current) < 0.1);
-                if (idx === -1) idx = 1; // Default to 1.25 if weird
+            // Update Standard Buttons
+            speedBtns.forEach(btn => {
+                if (btn.id === 'customSpeedBtn') return; // Skip custom
 
-                let nextIdx = (idx + 1) % speeds.length;
-                let nextSpeed = speeds[nextIdx];
-
-                console.log(`Cycling speed: ${current} -> ${nextSpeed}`);
-
-                // Update Storage
-                chrome.storage.local.set({ playbackSpeed: nextSpeed });
-
-                // Update UI Buttons
-                speedBtns.forEach(btn => {
-                    const btnSpeed = parseFloat(btn.dataset.speed);
-                    if (Math.abs(btnSpeed - nextSpeed) < 0.1) {
-                        btn.classList.add('active');
-                        // Trigger visual update event if needed, but handled by button click usually
-                    } else {
-                        btn.classList.remove('active');
-                    }
-                });
-
-                // Restart TTS if speaking to apply new speed?
-                // Usually SpeechSynthesis doesn't update on the fly easily without restart.
-                // For now, next utterance picks it up.
-
-                // If we also want to sync Video from here?
-                // The background sends to BOTH, so content.js will handle video.
+                const btnSpeed = parseFloat(btn.dataset.speed);
+                if (Math.abs(btnSpeed - speed) < 0.1) {
+                    btn.classList.add('active');
+                    isStandard = true;
+                } else {
+                    btn.classList.remove('active');
+                }
             });
+
+            // Handle Custom Button
+            if (!isStandard) {
+                if (customBtn) {
+                    customBtn.classList.remove('hidden');
+                    customBtn.classList.add('active');
+                    customBtn.textContent = (+speed.toFixed(2)) + 'x';
+                    customBtn.dataset.speed = speed;
+                }
+            } else {
+                if (customBtn) {
+                    customBtn.classList.add('hidden');
+                    customBtn.classList.remove('active');
+                }
+            }
         }
 
         // Player Updates

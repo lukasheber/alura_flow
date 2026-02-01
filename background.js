@@ -167,6 +167,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
     }
 
+    if (message.type === 'SPEED_UPDATED') {
+        // Persist
+        chrome.storage.local.set({ playbackSpeed: message.speed });
+        // Forward to Companion Window
+        getCompanionWindow((win) => {
+            if (win) {
+                chrome.tabs.query({ windowId: win.id }, (tabs) => {
+                    if (tabs && tabs.length > 0) chrome.tabs.sendMessage(tabs[0].id, message);
+                });
+            }
+        });
+    }
+
     // 2. PREPARE READING (Video Ended)
     if (message.type === 'PREPARE_READING_MODE') {
         // Just ensure it's open and maybe focused slightly
