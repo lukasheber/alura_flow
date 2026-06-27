@@ -144,7 +144,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Auto-read check
             chrome.storage.local.get(['autoReadEnabled'], (res) => {
-                if (res.autoReadEnabled) {
+                if (res.autoReadEnabled !== false) {
                     // Debounce start 
                     autoReadTimer = setTimeout(() => {
                         console.log("Auto-Read Timer Frying...");
@@ -191,6 +191,7 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.dataset.id = opt.id;
 
             if (opt.isCorrect) btn.classList.add('correct');
+            if (opt.isSelected) btn.classList.add('selected');
 
             // HTML Structure similar to quiz.js
             let html = `
@@ -242,9 +243,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Selection
             btn.addEventListener('click', () => {
-                // Single select logic for now (simplify)
-                document.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected', 'wrong'));
-                btn.classList.add('selected');
+                const isMultiple = data.isMultiple; // Captured from closure
+
+                if (isMultiple) {
+                    // Multi-select toggle
+                    btn.classList.toggle('selected');
+                } else {
+                    // Single select logic
+                    document.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected', 'wrong'));
+                    btn.classList.add('selected');
+                }
+
                 lastClickedOptionId = opt.id;
 
                 // Send to main tab
@@ -525,11 +534,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (btn) btn.classList.add('wrong');
             }
         }
-        if (msg.type === 'QUIZ_REVEAL_CORRECT') {
+        if (msg.type === 'QUIZ_REVEAL_CORRECT' || msg.type === 'QUIZ_FEEDBACK_SUCCESS') {
             if (msg.correctIds) {
                 msg.correctIds.forEach(id => {
                     const btn = document.querySelector(`.option-btn[data-id="${id}"]`);
-                    if (btn) btn.classList.add('reveal-correct');
+                    if (btn) {
+                        btn.classList.remove('wrong');
+                        btn.classList.add('reveal-correct');
+                    }
                 });
             }
         }

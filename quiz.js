@@ -157,12 +157,19 @@ chrome.runtime.onMessage.addListener((message) => {
         }
     }
 
-    if (message.type === 'QUIZ_REVEAL_CORRECT') {
+    if (message.type === 'QUIZ_REVEAL_CORRECT' || message.type === 'QUIZ_FEEDBACK_SUCCESS') {
         // Highlight the correct answer IDs (Pulsing Green)
         const correctIds = message.correctIds || []; // Array of strings
+
+        // If no IDs provided, try to use lastClickedOptionId as a fallback if it was correct?
+        // Actually, content.js should provide them. If not, we might be in trouble for multi-select.
+
         correctIds.forEach(id => {
             const btn = document.querySelector(`.option-btn[data-id="${id}"]`);
-            if (btn) btn.classList.add('reveal-correct');
+            if (btn) {
+                btn.classList.remove('wrong'); // Remove error state if any
+                btn.classList.add('reveal-correct');
+            }
         });
     }
 });

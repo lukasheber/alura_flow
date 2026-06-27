@@ -4,6 +4,48 @@
 let autoAdvanceEnabled = true;
 let currentState = null; // 'PLAYER' | 'CONTENT' | null
 let lastTitle = "";
+let hasAutoAdvanced = false;
+
+// --- DOM HELPERS ---
+function getNextButton() {
+    // 1. Check for Video Auto-Play Modal Continue button (Alura's new video player)
+    const continueBtn = document.querySelector('.autoplay-continue-button');
+    if (continueBtn && !continueBtn.closest('.vjs-hidden')) {
+        return continueBtn;
+    }
+
+    // 2. Old selector
+    let btn = document.querySelector('.task-actions-button-next');
+    if (btn) return btn;
+
+    // 3. New Data Slot selector
+    const buttons = Array.from(document.querySelectorAll('button[data-slot="ds-button-root"], a[data-slot="ds-button-root"]'));
+    const nextBtn = buttons.find(b => b.textContent.trim().toLowerCase().includes('avançar'));
+    if (nextBtn) return nextBtn;
+
+    // Fallback: old label span approach
+    const labels = Array.from(document.querySelectorAll('span[data-slot="ds-button-label"]'));
+    const labelSpan = labels.find(span => span.textContent.trim().toLowerCase() === 'avançar');
+    return labelSpan ? labelSpan.closest('button, a') : null;
+}
+
+function getPrevButton() {
+    let btn = document.querySelector('.task-actions-button-prev');
+    if (btn) return btn;
+    const buttons = Array.from(document.querySelectorAll('button[data-slot="ds-button-root"], a[data-slot="ds-button-root"]'));
+    const prevBtn = buttons.find(b => {
+        const text = b.textContent.trim().toLowerCase();
+        return text.includes('anterior') || text.includes('voltar');
+    });
+    if (prevBtn) return prevBtn;
+
+    const labels = Array.from(document.querySelectorAll('span[data-slot="ds-button-label"]'));
+    const labelSpan = labels.find(span => {
+        const text = span.textContent.trim().toLowerCase();
+        return text === 'anterior' || text === 'voltar';
+    });
+    return labelSpan ? labelSpan.closest('button, a') : null;
+}
 
 // --- INITIALIZATION ---
 function init() {
@@ -22,16 +64,24 @@ function init() {
 // --- STATE MANAGEMENT ---
 function reportState(force = false) {
     // 1. Detect Context
-    const headerTitleEl = document.querySelector('.task-body-header-title-text');
+    const headerTitleEl = document.querySelector('.task-body-header-title-text') ||
+        document.querySelector('h2.font-encode-sans');
     const title = headerTitleEl ? headerTitleEl.textContent.trim() : "Alura Flow";
 
     // A. VIDEO MODE
     const video = document.querySelector('video');
 
-    // Enhanced Video Detection: Icon OR Container OR Player ID
+    // Enhanced Video Detection: Icon OR Container OR Player ID OR New Data Attribute OR <video> tag OR Navigation Menu
     const isVideoLesson = !!document.querySelector('.task-body-header-title-svg use[href*="#VIDEO"]') ||
         !!document.querySelector('.video-container') ||
-        !!document.querySelector('#video-player');
+        !!document.querySelector('#video-player') ||
+        !!document.querySelector('[data-vjs-player="true"]') ||
+        !!video ||
+        (function () {
+            const allItems = Array.from(document.querySelectorAll('ul li.group a[href*="/task/"]'));
+            const currentItem = allItems.find(a => a.classList.contains('bg-surface-default') || a.classList.contains('border-l-brand-default') || a.getAttribute('aria-current') === 'page');
+            return currentItem && !!currentItem.querySelector('span.font-jetbrains-mono');
+        })();
 
     if (isVideoLesson) {
         if (video) {
@@ -62,9 +112,10 @@ function reportState(force = false) {
     }
 
     // B. QUIZ MODE
-    const quizContainer = document.querySelector('.alternativeList');
+    const quizContainer = document.querySelector('.alternativeList') || getNewStructureQuizElements();
     if (quizContainer) {
         if (currentState !== 'CONTENT' || title !== lastTitle || force) {
+            if (title !== lastTitle) hasAutoAdvanced = false;
             currentState = 'CONTENT';
             lastTitle = title;
             console.log("Report State: QUIZ");
@@ -79,13 +130,24 @@ function reportState(force = false) {
                     ...quizData
                 }
             });
+
+            // Check if already solved and auto-advance
+            if (quizData.isSolved && autoAdvanceEnabled && !hasAutoAdvanced) {
+                console.log("Quiz already solved. Auto-advancing...");
+                hasAutoAdvanced = true;
+                setTimeout(() => {
+                    handleTransition();
+                    const nextBtn = getNextButton();
+                    if (nextBtn) nextBtn.click();
+                }, 1500);
+            }
         }
         return;
     }
 
     // C. TEXT READING MODE
     // Filter out Transcriptions to prevent false positives
-    const candidates = document.querySelectorAll('.hqExplanation .formattedText, #task-content .formattedText');
+    const candidates = document.querySelectorAll('.hqExplanation .formattedText, #task-content .formattedText, section[aria-label="Conteúdo da aula"]');
     let textContent = null;
 
     for (const cand of candidates) {
@@ -103,6 +165,21 @@ function reportState(force = false) {
             lastTitle = title;
             console.log("Report State: TEXT");
 
+            // Clone to avoid modifying the actual page
+            const cleanContent = textContent.cloneNode(true);
+
+            // Remove "Estou com dúvida" slot and specific buttons
+            const extraActionSlot = cleanContent.querySelector('#task-content-extra-action-slot');
+            if (extraActionSlot) extraActionSlot.remove();
+
+            const buttons = Array.from(cleanContent.querySelectorAll('button, a'));
+            buttons.forEach(btn => {
+                const text = btn.textContent.trim().toLowerCase();
+                if (text.includes('estou com dúvida') || text === 'avançar') {
+                    btn.remove();
+                }
+            });
+
             // Extract Opinion
             let opinionHtml = null;
             const opinionEl = document.querySelector('#task-feedback .formattedText'); // Challenge opinion
@@ -113,14 +190,14 @@ function reportState(force = false) {
                 mode: 'CONTENT',
                 data: {
                     title: title,
-                    html: textContent.innerHTML,
+                    html: cleanContent.innerHTML,
                     opinionHtml: opinionHtml
                 }
             });
 
             // Save for persistence
             chrome.storage.local.set({
-                currentReading: { title: title, html: textContent.innerHTML, opinionHtml: opinionHtml }
+                currentReading: { title: title, html: cleanContent.innerHTML, opinionHtml: opinionHtml }
             });
         }
         return;
@@ -139,7 +216,18 @@ function attachVideoListeners(video) {
     });
 
     video.addEventListener('ratechange', () => {
+        // Prevent broadcasting the browser's automatic reset to 1.0 when video src changes in SPAs
+        if (video.readyState === 0) return;
         chrome.runtime.sendMessage({ type: 'SPEED_UPDATED', speed: video.playbackRate });
+    });
+
+    // Enforce speed when new video loads
+    video.addEventListener('loadedmetadata', () => {
+        chrome.storage.local.get(['playbackSpeed'], (res) => {
+            if (res.playbackSpeed && video.playbackRate !== res.playbackSpeed) {
+                video.playbackRate = res.playbackSpeed;
+            }
+        });
     });
 
     // Apply persisted speed immediately when attaching
@@ -159,7 +247,7 @@ function attachVideoListeners(video) {
             // Optimistic switch trigger
             handleTransition();
             setTimeout(() => {
-                const nextBtn = document.querySelector('.task-actions-button-next');
+                const nextBtn = getNextButton();
                 if (nextBtn) nextBtn.click();
             }, 1000);
         }
@@ -180,7 +268,89 @@ function attachVideoListeners(video) {
     }, 500);
 }
 
+function getNewStructureQuizElements() {
+    const instructionP = Array.from(document.querySelectorAll('p')).find(p => p.textContent.trim().toLowerCase().includes('selecione uma alternativa') || p.textContent.trim().toLowerCase().includes('selecione as alternativas'));
+
+    if (instructionP) {
+        const ul = instructionP.nextElementSibling;
+        if (ul && ul.tagName === 'UL') {
+            const options = ul.querySelectorAll('li button.group');
+            if (options.length > 0) {
+                return { instructionP, ul, options };
+            }
+        }
+    }
+
+    // Alternative: Just find the UL with the specific buttons
+    const options = document.querySelectorAll('ul > li > button.group');
+    if (options.length > 0 && options[0].querySelector('.text-task-alternative-content-text')) {
+        const ul = options[0].closest('ul');
+        let instructionP = ul.previousElementSibling;
+        if (instructionP && instructionP.tagName !== 'P') instructionP = null;
+        return { instructionP, ul, options };
+    }
+
+    return null;
+}
+
 function extractQuizData() {
+    const newQuizData = getNewStructureQuizElements();
+
+    if (newQuizData) {
+        // New Structure
+        let questionHTML = "";
+        let currentElement = newQuizData.instructionP ? newQuizData.instructionP.previousElementSibling : newQuizData.ul.previousElementSibling;
+        const questionElements = [];
+
+        while (currentElement) {
+            // Stop if we hit a div that looks like a header or container
+            if (currentElement.tagName === 'DIV' || currentElement.tagName === 'HEADER') {
+                break;
+            }
+            if (currentElement.tagName === 'P') {
+                questionElements.unshift(currentElement.outerHTML);
+            }
+            currentElement = currentElement.previousElementSibling;
+        }
+
+        questionHTML = questionElements.length > 0 ? questionElements.join('') : "Questão";
+        const instructionHTML = newQuizData.instructionP ? newQuizData.instructionP.innerHTML : "";
+
+        const options = Array.from(newQuizData.options).map((btn, index) => {
+            const textContainer = btn.querySelector('.text-task-alternative-content-text');
+            const html = textContainer ? textContainer.innerHTML : "";
+
+            // Make a best guess on states
+            const isSelected = btn.className.includes('border-interactive-primary') || btn.className.includes('bg-surface-secondary') || btn.getAttribute('aria-selected') === 'true';
+            const isCorrect = btn.className.includes('success') || btn.className.includes('correct');
+
+            return {
+                id: index.toString(),
+                html: html,
+                opinionHTML: "",
+                isCorrect: isCorrect,
+                isSelected: isSelected,
+                isNewStructure: true
+            };
+        });
+
+        const isMultiple = instructionHTML.toLowerCase().includes('alternativas');
+        let requiredChoices = 0;
+        if (isMultiple) {
+            const match = instructionHTML.match(/selecione\s+(\d+)/i);
+            if (match) requiredChoices = parseInt(match[1], 10);
+        }
+
+        return {
+            questionHTML,
+            instructionHTML,
+            options,
+            isSolved: options.some(o => o.isCorrect && o.isSelected),
+            isMultiple,
+            requiredChoices
+        };
+    }
+
     const questionEl = document.querySelector('.choiceable-title');
     const questionHTML = questionEl ? questionEl.innerHTML : "Questão";
 
@@ -202,38 +372,70 @@ function extractQuizData() {
         // Fallback check in opinion text if dataset is unreliable
         if (opinionEl && opinionEl.textContent.toLowerCase().includes('correta')) isCorrect = true;
 
+        const isSelected = item.classList.contains('alternativeList-item--checked') ||
+            item.querySelector('input:checked');
+
         return {
             id: item.dataset.alternativeId,
             html: textEl ? textEl.innerHTML : "",
             opinionHTML: opinionEl ? opinionEl.innerHTML : "",
-            isCorrect: isCorrect
+            isCorrect: isCorrect,
+            isSelected: !!isSelected
         };
     });
+
+    // Check if the quiz is fully solved (correct answer selected)
+    // For multiple choice, we might need stricter logic, but for now checking if ANY correct answer is selected is a good start.
+    // Ideally, we check if ALL loaded correct answers are selected.
+    const isSolved = options.some(o => o.isCorrect && o.isSelected);
+
+    // Detect Multiple Choice
+    const isMultiple = Array.from(items).some(i => i.querySelector('input[type="checkbox"]'));
+
+    // Extract required choices count
+    let requiredChoices = 0;
+    if (isMultiple) {
+        // Try to parse "Selecione X alternativas"
+        const match = instructionHTML.match(/selecione\s+(\d+)/i);
+        if (match) requiredChoices = parseInt(match[1], 10);
+    }
 
     return {
         questionHTML,
         instructionHTML,
-        options
+        options,
+        isSolved,
+        isMultiple,
+        requiredChoices
     };
 }
 
 // --- SMART TRANSITIONS ---
 function predictNextLesson() {
     try {
-        const currentItem = document.querySelector('.task-menu-nav-item--selected');
-        if (!currentItem) return null;
+        // Old structure
+        const oldCurrentItem = document.querySelector('.task-menu-nav-item--selected');
+        if (oldCurrentItem) {
+            const nextItem = oldCurrentItem.nextElementSibling;
+            if (!nextItem) return null;
+            const link = nextItem.querySelector('.task-menu-nav-item-link');
+            if (!link) return null;
+            const isVideo = link.classList.contains('task-menu-nav-item-link-VIDEO');
+            return isVideo ? 'VIDEO' : 'CONTENT';
+        }
 
-        const nextItem = currentItem.nextElementSibling;
-        if (!nextItem) return null;
+        // New structure
+        const allItems = Array.from(document.querySelectorAll('ul li.group a[href*="/task/"]'));
+        const currentIndex = allItems.findIndex(a => a.classList.contains('bg-surface-default') || a.classList.contains('border-l-brand-default') || a.getAttribute('aria-current') === 'page');
 
-        const link = nextItem.querySelector('.task-menu-nav-item-link');
-        if (!link) return null;
+        if (currentIndex >= 0 && currentIndex < allItems.length - 1) {
+            const nextLink = allItems[currentIndex + 1];
+            // Videos have a duration span with font-jetbrains-mono (e.g. "02 min")
+            const isVideo = !!nextLink.querySelector('span.font-jetbrains-mono');
+            return isVideo ? 'VIDEO' : 'CONTENT';
+        }
 
-        // Check for Video Class or Icon
-        const isVideo = link.classList.contains('task-menu-nav-item-link-VIDEO');
-        if (isVideo) return 'VIDEO';
-
-        return 'CONTENT'; // Default to content/text
+        return null;
     } catch (e) {
         console.error("Prediction failed:", e);
         return null;
@@ -268,7 +470,7 @@ function setupStateObserver() {
         }
 
         // Listen for Next Button (if re-rendered)
-        const nextBtn = document.querySelector('.task-actions-button-next');
+        const nextBtn = getNextButton();
         if (nextBtn && !nextBtn.dataset.afTransition) {
             nextBtn.dataset.afTransition = "true";
             nextBtn.addEventListener('click', handleTransition);
@@ -288,14 +490,20 @@ function setupStateObserver() {
 function setupAutoAdvanceObserver() {
     // Watch for Quiz completion / feedback
     const observer = new MutationObserver((mutations) => {
+        // --- OLD STRUCTURE ---
         const feedback = document.querySelector('.choiceable-aria-feedback');
-        if (feedback) {
+        if (feedback && !feedback.dataset.afFeedbackHandled) {
+            feedback.dataset.afFeedbackHandled = "true";
             const text = feedback.textContent.toLowerCase();
             if (text.includes('acertou') || text.includes('parabéns')) {
                 // Success
+                const correctItems = document.querySelectorAll('.alternativeList-item--correct');
+                const ids = Array.from(correctItems).map(i => i.dataset.alternativeId);
+                chrome.runtime.sendMessage({ type: 'QUIZ_FEEDBACK_SUCCESS', correctIds: ids });
+
                 if (autoAdvanceEnabled) {
                     setTimeout(() => {
-                        const nextBtn = document.querySelector('.task-actions-button-next');
+                        const nextBtn = getNextButton();
                         if (nextBtn) {
                             handleTransition();
                             nextBtn.click();
@@ -308,9 +516,62 @@ function setupAutoAdvanceObserver() {
 
                 // Find correct ones
                 const correctItems = document.querySelectorAll('.alternativeList-item--correct');
-                const ids = Array.from(correctItems).map(i => i.dataset.alternativeId);
+            const ids = Array.from(correctItems).map(i => i.dataset.alternativeId);
                 if (ids.length > 0) {
                     chrome.runtime.sendMessage({ type: 'QUIZ_REVEAL_CORRECT', correctIds: ids });
+                }
+            }
+        }
+
+        // --- NEW STRUCTURE ---
+        const newQuizData = getNewStructureQuizElements();
+        if (newQuizData && newQuizData.ul) {
+            const options = Array.from(newQuizData.options);
+
+            const hasCorrect = options.some(btn => btn.querySelector('[aria-label="Resposta correta"]') || btn.className.includes('feedback-success'));
+            const hasError = options.some(btn => btn.querySelector('[aria-label="Resposta incorreta"]') || btn.className.includes('feedback-error') || btn.className.includes('incorrect'));
+
+            let currentStateStr = "none";
+            if (hasCorrect) {
+                currentStateStr = "correct";
+            } else if (hasError) {
+                const errorIndices = [];
+                options.forEach((btn, idx) => {
+                    if (btn.querySelector('[aria-label="Resposta incorreta"]') || btn.className.includes('feedback-error') || btn.className.includes('incorrect')) {
+                        errorIndices.push(idx);
+                    }
+                });
+                currentStateStr = "error:" + errorIndices.join(',');
+            }
+
+            if (currentStateStr !== "none" && newQuizData.ul.dataset.afFeedbackState !== currentStateStr) {
+                newQuizData.ul.dataset.afFeedbackState = currentStateStr;
+
+                const correctIds = [];
+                options.forEach((btn, index) => {
+                    if (btn.querySelector('[aria-label="Resposta correta"]') || btn.className.includes('feedback-success')) {
+                        correctIds.push(index.toString());
+                    }
+                });
+
+                if (currentStateStr === "correct") {
+                    // Success
+                    chrome.runtime.sendMessage({ type: 'QUIZ_FEEDBACK_SUCCESS', correctIds: correctIds });
+                    if (autoAdvanceEnabled) {
+                        setTimeout(() => {
+                            const nextBtn = getNextButton();
+                            if (nextBtn) {
+                                handleTransition();
+                                nextBtn.click();
+                            }
+                        }, 1500);
+                    }
+                } else if (currentStateStr.startsWith("error")) {
+                    // Error
+                    chrome.runtime.sendMessage({ type: 'QUIZ_FEEDBACK_ERROR' });
+                    if (correctIds.length > 0) {
+                        chrome.runtime.sendMessage({ type: 'QUIZ_REVEAL_CORRECT', correctIds: correctIds });
+                    }
                 }
             }
         }
@@ -327,22 +588,29 @@ chrome.runtime.onMessage.addListener((msg) => {
         }
     }
     if (msg.type === 'COMMAND_NEXT' || msg.type === 'FINISH_READING') {
-        const nextBtn = document.querySelector('.task-actions-button-next');
+        const nextBtn = getNextButton();
         if (nextBtn) {
             handleTransition();
             nextBtn.click();
         }
     }
     if (msg.type === 'COMMAND_PREV') {
-        const prevBtn = document.querySelector('.task-actions-button-prev');
+        const prevBtn = getPrevButton();
         if (prevBtn) {
             prevBtn.click();
         } else {
             // Fallback: Try to find previous sibling in navbar
-            const currentItem = document.querySelector('.task-menu-nav-item--selected');
-            if (currentItem && currentItem.previousElementSibling) {
-                const prevLink = currentItem.previousElementSibling.querySelector('.task-menu-nav-item-link');
+            const oldCurrentItem = document.querySelector('.task-menu-nav-item--selected');
+            if (oldCurrentItem && oldCurrentItem.previousElementSibling) {
+                const prevLink = oldCurrentItem.previousElementSibling.querySelector('.task-menu-nav-item-link');
                 if (prevLink) prevLink.click();
+            } else {
+                // New structure fallback
+                const allItems = Array.from(document.querySelectorAll('ul li.group a[href*="/task/"]'));
+                const currentIndex = allItems.findIndex(a => a.classList.contains('bg-surface-default') || a.classList.contains('border-l-brand-default'));
+                if (currentIndex > 0) {
+                    allItems[currentIndex - 1].click();
+                }
             }
         }
     }
@@ -371,6 +639,15 @@ chrome.runtime.onMessage.addListener((msg) => {
         if (item) {
             const label = item.querySelector('label');
             if (label) label.click();
+        } else {
+            // New structure fallback
+            const newQuizData = getNewStructureQuizElements();
+            if (newQuizData && newQuizData.options) {
+                const index = parseInt(msg.optionId, 10);
+                if (!isNaN(index) && newQuizData.options[index]) {
+                    newQuizData.options[index].click();
+                }
+            }
         }
     }
     if (msg.type === 'COMPANION_READY') {

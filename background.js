@@ -126,7 +126,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === 'UPDATE_STATE') {
         if (message.mode === 'PLAYER') {
             chrome.storage.local.get(['autoMinimizeEnabled'], (result) => {
-                if (result.autoMinimizeEnabled) {
+                if (result.autoMinimizeEnabled !== false) {
                     getCompanionWindow((win) => {
                         if (win) chrome.windows.update(win.id, { state: 'minimized' });
                     });
@@ -272,7 +272,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const predictedMode = message.predictedMode;
 
         chrome.storage.local.get(['autoMinimizeEnabled'], (res) => {
-            if (res.autoMinimizeEnabled && predictedMode === 'PLAYER') {
+            if (res.autoMinimizeEnabled !== false && predictedMode === 'PLAYER') {
                 // Optimistic Minimize!
                 getCompanionWindow((win) => {
                     if (win) {
