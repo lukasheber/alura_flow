@@ -1,584 +1,389 @@
+'use strict';
+
 document.addEventListener('DOMContentLoaded', () => {
-    // --- STATE & VARS ---
-    let currentMode = 'NONE'; // 'PLAYER' | 'CONTENT'
-    let synth = window.speechSynthesis;
+    const byId = id => document.getElementById(id);
+    const ui = {
+        led: byId('connectionLed'), title: byId('mainTitle'), player: byId('view-player'), content: byId('view-content'),
+        text: byId('textContainer'), quiz: byId('quizContainer'), dynamic: byId('dynamicContent'), opinion: byId('opinionSection'),
+        opinionContent: byId('opinionContent'), videoStatus: byId('videoStatusText'), play: byId('remotePlay'), prev: byId('remotePrev'),
+        next: byId('remoteNext'), tts: byId('ttsBtn'), ttsTop: byId('ttsBtnTop'), finish: byId('finishBtn'),
+        finishTop: byId('finishBtnTop'), fab: byId('ttsFab'), banner: byId('advanceBanner'), bannerMessage: byId('advanceMessage'),
+        bannerAction: byId('advanceAction'), history: byId('historyList')
+    };
+    const synth = window.speechSynthesis;
+    let currentMode = 'NONE';
+    let currentData = null;
+    let currentViewKey = '';
     let isSpeaking = false;
     let isPaused = false;
-    let userStopped = false;
-    let activeUtterances = [];
-    let lastClickedOptionId = null;
+    let speechGeneration = 0;
     let autoReadTimer = null;
+    let lastClickedOptionId = null;
+    let bannerMode = 'cancel';
+    let undoTimer = null;
 
-    // --- UI ELEMENTS ---
-    const connectionLed = document.getElementById('connectionLed');
-    const mainTitle = document.getElementById('mainTitle');
+    function runtimeMessage(message) {
+        return new Promise(resolve => chrome.runtime.sendMessage(message, response => resolve(response || {})));
+    }
 
-    // Views
-    const viewPlayer = document.getElementById('view-player');
-    const viewContent = document.getElementById('view-content');
-
-    // Content Containers
-    const textContainer = document.getElementById('textContainer');
-    const quizContainer = document.getElementById('quizContainer');
-    const dynamicContent = document.getElementById('dynamicContent');
-    const opinionSection = document.getElementById('opinionSection');
-    const opinionContent = document.getElementById('opinionContent');
-
-    // Player Controls
-    const videoStatusText = document.getElementById('videoStatusText');
-    const remotePrev = document.getElementById('remotePrev');
-    const remotePlay = document.getElementById('remotePlay');
-    const remoteNext = document.getElementById('remoteNext');
-    const speedBtns = document.querySelectorAll('.speed-btn');
-
-    // Reading Controls
-    const ttsBtn = document.getElementById('ttsBtn');
-    const ttsBtnTop = document.getElementById('ttsBtnTop');
-    const finishBtn = document.getElementById('finishBtn');
-    const finishBtnTop = document.getElementById('finishBtnTop');
-    const fab = document.getElementById('ttsFab');
-
-    // --- MODE SWITCHING ---
-    window.switchMode = (mode, data) => {
-        console.log(`Switching execution mode to: ${mode}`, data);
-        currentMode = mode;
-
-        // Reset States
-        if (mode !== 'CONTENT') stopSpeaking(); // Auto-stop TTS
-
-        // UI Toggles
-        if (mode === 'PLAYER') {
-            viewPlayer.classList.remove('hidden');
-            viewContent.classList.add('hidden');
-            fab.classList.remove('visible'); // Hide FAB in video mode
-
-            // Update Data
-            if (data && data.title) mainTitle.textContent = data.title;
-            if (data && data.status) videoStatusText.textContent = data.status === 'playing' ? "Reproduzindo..." : "Pausado";
-
-        } else if (mode === 'CONTENT') {
-            viewPlayer.classList.add('hidden');
-            viewContent.classList.remove('hidden');
-
-            // Render specific content type
-            if (data.isQuiz) {
-                renderQuiz(data);
-            } else {
-                renderText(data);
-            }
+    document.addEventListener('keydown', event => {
+        if (event.repeat || event.metaKey || event.shiftKey) return;
+        if (event.ctrlKey && event.altKey && (event.code === 'KeyS' || event.key.toLowerCase() === 's')) {
+            event.preventDefault();
+            runtimeMessage({ type: 'CYCLE_SPEED_REQUEST' });
         }
-    };
+    }, true);
 
-    // --- RENDER FUNCTIONS ---
-    function setSafeHTML(element, html) {
+    function safeHTML(element, html) {
         if (!element) return;
-        element.innerHTML = '';
+        element.replaceChildren();
         if (!html) return;
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
-        Array.from(doc.body.childNodes).forEach(node => element.appendChild(node));
-    }
-
-    function renderText(data) {
-        textContainer.classList.remove('hidden');
-        quizContainer.classList.add('hidden');
-        textContainer.classList.remove('hidden');
-        quizContainer.classList.add('hidden');
-        const isLoading = data.title && data.title.includes("Carregando");
-
-        if (isLoading) {
-            if (ttsBtn) ttsBtn.classList.add('hidden');
-            if (ttsBtnTop) ttsBtnTop.classList.add('hidden');
-            if (finishBtnTop) finishBtnTop.classList.add('hidden');
-            // Also hide bottom finish button if possible or rely on CSS/Logic?
-            // Since finishBtn is not toggled in renderText usually, we adding logic:
-            if (finishBtn) finishBtn.classList.add('hidden');
-        } else {
-            if (ttsBtn) ttsBtn.classList.remove('hidden');
-            if (ttsBtnTop) ttsBtnTop.classList.remove('hidden');
-            if (finishBtnTop) finishBtnTop.classList.remove('hidden');
-            if (finishBtn) finishBtn.classList.remove('hidden');
-        }
-
-        mainTitle.textContent = data.title || "Leitura";
-
-        let contentChanged = false;
-
-        // Prevent scroll reset if content is identical
-        const newHtml = data.html || "";
-        if (dynamicContent.innerHTML !== newHtml) {
-            setSafeHTML(dynamicContent, newHtml);
-            contentChanged = true;
-        }
-
-        // Opinion
-        if (data.opinionHtml) {
-            if (opinionContent.innerHTML !== data.opinionHtml) {
-                setSafeHTML(opinionContent, data.opinionHtml);
-                contentChanged = true;
-            }
-            opinionSection.classList.remove('hidden');
-        } else {
-            if (!opinionSection.classList.contains('hidden')) {
-                // Was visible, now hidden -> changed
-                contentChanged = true;
-            }
-            opinionSection.classList.add('hidden');
-        }
-
-        if (contentChanged) {
-            // New Lesson detected! Reset state so Auto-Read can trigger
-            console.log("New content detected, resetting TTS state.");
-            userStopped = false;
-
-            // Cancel any pending auto-read
-            if (autoReadTimer) clearTimeout(autoReadTimer);
-
-            synth.cancel(); // Stop any previous audio
-            isSpeaking = false;
-            isPaused = false;
-            updateFabState();
-            updateFabState();
-            if (ttsBtn) ttsBtn.textContent = "🔊 Ouvir";
-            if (ttsBtnTop) ttsBtnTop.textContent = "🔊 Ouvir";
-
-            // Auto-read check
-            chrome.storage.local.get(['autoReadEnabled'], (res) => {
-                if (res.autoReadEnabled !== false) {
-                    // Debounce start 
-                    autoReadTimer = setTimeout(() => {
-                        console.log("Auto-Read Timer Frying...");
-                        startSpeaking();
-                    }, 500);
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        doc.querySelectorAll('script, iframe, object, embed, form, input, textarea, select, button, meta, base').forEach(node => node.remove());
+        doc.querySelectorAll('*').forEach(node => {
+            Array.from(node.attributes).forEach(attribute => {
+                const name = attribute.name.toLowerCase();
+                if (name.startsWith('on') || name === 'srcdoc' || name === 'style' && /url\s*\(|expression\s*\(/i.test(attribute.value)) {
+                    node.removeAttribute(attribute.name);
                 }
             });
-        }
-    }
-
-    function renderQuiz(data) {
-        textContainer.classList.add('hidden');
-        quizContainer.classList.remove('hidden');
-        textContainer.classList.add('hidden');
-        quizContainer.classList.remove('hidden');
-        if (ttsBtn) ttsBtn.classList.add('hidden');
-        if (ttsBtnTop) ttsBtnTop.classList.add('hidden');
-        // Hide top finish button in quiz, as quiz has its own flow or reuse bottom?
-        // Usually quiz has options, no "finish" button until done. 
-        if (finishBtnTop) finishBtnTop.classList.add('hidden');
-        mainTitle.textContent = "Quiz"; // Or keep lesson title if available
-
-        setSafeHTML(document.getElementById('quizQuestion'), data.questionHTML || "Pergunta");
-
-        // Render Instruction (e.g. "Select 1 option")
-        const instructionEl = document.getElementById('quizInstruction');
-        if (instructionEl) {
-            setSafeHTML(instructionEl, data.instructionHTML || "");
-            if (data.instructionHTML) instructionEl.classList.remove('hidden');
-            else instructionEl.classList.add('hidden');
-        }
-
-        const optionsList = document.getElementById('quizOptions');
-        optionsList.innerHTML = '';
-
-        if (!data.options) return;
-
-        data.options.forEach((opt, index) => {
-            const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-            const letter = (index < letters.length ? letters[index] : index + 1);
-
-            const btn = document.createElement('button');
-            btn.className = 'option-btn';
-            btn.dataset.id = opt.id;
-
-            if (opt.isCorrect) btn.classList.add('correct');
-            if (opt.isSelected) btn.classList.add('selected');
-
-            // HTML Structure similar to quiz.js
-            let html = `
-                <div class="opt-main-row">
-                    <span class="option-index">${letter}</span>
-                    <span>${opt.html}</span>
-                </div>
-            `;
-
-            // Hint Logic
-            let hintHtml = '';
-            if (opt.opinionHTML) {
-                let cleanHint = opt.opinionHTML.trim();
-                // Remove outer parens if present just in case
-                if (cleanHint.startsWith('(') && cleanHint.endsWith(')')) {
-                    cleanHint = cleanHint.substring(1, cleanHint.length - 1);
-                }
-
-                hintHtml = `
-                    <div class="opt-hint-row">
-                        <span class="hint-toggle"><span style="font-size: 1.1em">🗨️</span> Ver dica</span>
-                        <div class="hint-content hidden">${cleanHint}</div>
-                    </div>
-                `;
-            }
-
-            setSafeHTML(btn, html + hintHtml);
-            optionsList.appendChild(btn);
-
-            // Bind Events
-            // Hint Toggle
-            const toggle = btn.querySelector('.hint-toggle');
-            if (toggle) {
-                toggle.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const content = btn.querySelector('.hint-content');
-                    const row = btn.querySelector('.opt-hint-row');
-                    const isHidden = content.classList.toggle('hidden');
-
-                    if (isHidden) {
-                        setSafeHTML(toggle, '<span style="font-size: 1.1em">🗨️</span> Ver dica');
-                        row.classList.remove('active');
-                    } else {
-                        toggle.textContent = '❌ Esconder dica';
-                        row.classList.add('active');
-                    }
-                });
-            }
-
-            // Selection
-            btn.addEventListener('click', () => {
-                const isMultiple = data.isMultiple; // Captured from closure
-
-                if (isMultiple) {
-                    // Multi-select toggle
-                    btn.classList.toggle('selected');
-                } else {
-                    // Single select logic
-                    document.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected', 'wrong'));
-                    btn.classList.add('selected');
-                }
-
-                lastClickedOptionId = opt.id;
-
-                // Send to main tab
-                chrome.tabs.query({ url: "*://*.alura.com.br/*" }, (tabs) => {
-                    tabs.forEach(t => chrome.tabs.sendMessage(t.id, { type: 'SELECT_OPTION', optionId: opt.id }));
-                });
+            ['href', 'src', 'poster'].forEach(name => {
+                if (!node.hasAttribute(name)) return;
+                try {
+                    const url = new URL(node.getAttribute(name));
+                    if (!['http:', 'https:', 'data:'].includes(url.protocol) || (name === 'href' && url.protocol === 'data:')) node.removeAttribute(name);
+                } catch (_) { node.removeAttribute(name); }
             });
-        });
-    }
-
-    // --- PLAYER CONTROLS ---
-    if (remotePlay) {
-        remotePlay.addEventListener('click', () => {
-            chrome.runtime.sendMessage({ type: 'COMMAND_PLAY_PAUSE' });
-        });
-    }
-    if (remotePrev) {
-        remotePrev.addEventListener('click', () => {
-            chrome.runtime.sendMessage({ type: 'COMMAND_PREV' });
-        });
-    }
-    if (remoteNext) {
-        remoteNext.addEventListener('click', () => {
-            chrome.runtime.sendMessage({ type: 'COMMAND_NEXT' });
-        });
-    }
-
-    speedBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            const speed = parseFloat(btn.dataset.speed);
-            // Visual update
-            speedBtns.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-
-            // Send
-            chrome.tabs.query({ url: "*://*.alura.com.br/*" }, (tabs) => {
-                tabs.forEach(t => chrome.tabs.sendMessage(t.id, { type: 'UPDATE_SPEED', speed: speed }));
-            });
-            // Also save
-            chrome.storage.local.set({ playbackSpeed: speed });
-        });
-    });
-
-    // --- TTS LOGIC (Simplified from previous reading.js) ---
-    function updateFabState() {
-        if (!fab) return;
-        if (isSpeaking) {
-            fab.classList.add('visible');
-            fab.textContent = isPaused ? "▶️" : "⏸️";
-        } else {
-            fab.classList.remove('visible');
-        }
-    }
-
-    function getReadableElements(container) {
-        const selector = 'p, h1, h2, h3, li';
-        const all = Array.from(container.querySelectorAll(selector));
-        return all.filter(el => {
-            // Filter out elements that contain other selected elements
-            // This prevents double reading of <li><p>Text</p></li>
-            // We favor the "leaf" nodes (e.g. the p inside the li)
-            return !all.some(child => child !== el && el.contains(child));
-        });
-    }
-
-    function startSpeaking() {
-        synth.cancel();
-        activeUtterances = [];
-        userStopped = false;
-        isPaused = false;
-
-
-        // Gather text
-        let elements = getReadableElements(dynamicContent);
-        // Include opinion if visible
-        if (!opinionSection.classList.contains('hidden')) {
-            elements = elements.concat(getReadableElements(opinionContent));
-        }
-
-        // Guard: Do not read if Loading or Quiz (unless specific accessibility mode, but simplifying for now)
-        if (mainTitle.textContent.includes("Carregando") || mainTitle.textContent === "Quiz") {
-            console.log("Skipping TTS for Loading/Quiz state");
-            return;
-        }
-
-        // Get configured speed
-        chrome.storage.local.get(['playbackSpeed', 'autoAdvanceEnabled'], (result) => {
-            const rate = result.playbackSpeed || 1.2;
-            const autoAdvance = result.autoAdvanceEnabled !== false; // Default true
-
-            if (elements.length === 0) {
-                // Fallback
-                const u = new SpeechSynthesisUtterance(dynamicContent.innerText + " " + opinionContent.innerText);
-                u.lang = 'pt-BR'; u.rate = rate;
-                u.onend = () => {
-                    // Natural finish
-                    document.querySelectorAll('.reading-active').forEach(e => e.classList.remove('reading-active'));
-                    isSpeaking = false;
-                    updateFabState();
-                    updateFabState();
-                    if (ttsBtn) ttsBtn.textContent = "🔊 Ouvir";
-                    if (ttsBtnTop) ttsBtnTop.textContent = "🔊 Ouvir";
-
-                    if (!userStopped && autoAdvance) finish();
-                };
-                synth.speak(u);
-                isSpeaking = true;
-            } else {
-                elements.forEach((el, index) => {
-                    const text = el.innerText.trim();
-                    if (!text) return;
-                    const u = new SpeechSynthesisUtterance(text);
-                    u.lang = 'pt-BR'; u.rate = rate;
-
-                    u.onstart = () => {
-                        // Only scroll if we are actually speaking and haven't been stopped
-                        if (userStopped) return;
-                        document.querySelectorAll('.reading-active').forEach(e => e.classList.remove('reading-active'));
-                        el.classList.add('reading-active');
-                        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    };
-                    u.onend = () => {
-                        el.classList.remove('reading-active');
-                        if (index === elements.length - 1) {
-                            // Natural Finish
-                            isSpeaking = false;
-                            updateFabState();
-                            updateFabState();
-                            if (ttsBtn) ttsBtn.textContent = "🔊 Ouvir";
-                            if (ttsBtnTop) ttsBtnTop.textContent = "🔊 Ouvir";
-
-                            // Only advance if NOT stopped by user
-                            if (!userStopped && autoAdvance) finish();
-                        }
-                    };
-                    activeUtterances.push(u);
-                    synth.speak(u);
-                });
-                isSpeaking = true;
+            if (node.tagName === 'A') {
+                node.target = '_blank';
+                node.rel = 'noopener noreferrer';
             }
-
-            if (ttsBtn) ttsBtn.textContent = "⏹ Parar";
-            if (ttsBtnTop) ttsBtnTop.textContent = "⏹ Parar";
-            updateFabState();
         });
-    }
-
-    // Helper for finish
-    function finish() {
-        console.log("Auto-Advancing via Runtime...");
-        chrome.runtime.sendMessage({ type: 'FINISH_READING' });
+        element.append(...Array.from(doc.body.childNodes));
     }
 
     function stopSpeaking() {
-        userStopped = true;
+        speechGeneration += 1;
+        clearTimeout(autoReadTimer);
+        autoReadTimer = null;
         synth.cancel();
         isSpeaking = false;
         isPaused = false;
-        if (ttsBtn) ttsBtn.textContent = "🔊 Ouvir";
-        if (ttsBtnTop) ttsBtnTop.textContent = "🔊 Ouvir";
-        document.querySelectorAll('.reading-active').forEach(e => e.classList.remove('reading-active'));
-        updateFabState();
+        document.querySelectorAll('.reading-active').forEach(element => element.classList.remove('reading-active'));
+        [ui.tts, ui.ttsTop].forEach(button => { if (button) button.textContent = '🔊 Ouvir'; });
+        updateFab();
+    }
+
+    function updateFab() {
+        ui.fab.classList.toggle('visible', isSpeaking);
+        ui.fab.textContent = isPaused ? '▶️' : '⏸️';
+        ui.fab.setAttribute('aria-label', isPaused ? 'Retomar leitura' : 'Pausar leitura');
+    }
+
+    function readableElements(container) {
+        const all = Array.from(container.querySelectorAll('p, h1, h2, h3, li, blockquote, pre'));
+        return all.filter(element => !all.some(child => child !== element && element.contains(child)) && element.innerText.trim());
+    }
+
+    function bestVoice(voices, voiceURI, language) {
+        return voices.find(voice => voice.voiceURI === voiceURI) ||
+            voices.find(voice => voice.lang.toLowerCase() === language.toLowerCase()) ||
+            voices.find(voice => voice.lang.toLowerCase().startsWith(language.split('-')[0].toLowerCase())) || null;
+    }
+
+    function startSpeaking() {
+        if (currentMode !== 'CONTENT' || currentData?.isQuiz || !currentData || AluraFlowCore.isLoadingState(currentData)) return;
+        stopSpeaking();
+        const generation = speechGeneration;
+        const elements = readableElements(ui.dynamic).concat(ui.opinion.classList.contains('hidden') ? [] : readableElements(ui.opinionContent));
+        if (!elements.length) return;
+
+        chrome.storage.local.get(['ttsRate', 'ttsVoiceURI', 'autoAdvanceEnabled'], settings => {
+            if (generation !== speechGeneration || currentMode !== 'CONTENT' || currentData?.isQuiz || AluraFlowCore.isLoadingState(currentData)) return;
+            const voice = bestVoice(synth.getVoices(), settings.ttsVoiceURI || '', currentData.language || 'pt-BR');
+            let completed = 0;
+            isSpeaking = true;
+            [ui.tts, ui.ttsTop].forEach(button => { if (button) button.textContent = '⏹ Parar'; });
+            updateFab();
+
+            elements.forEach(element => {
+                const utterance = new SpeechSynthesisUtterance(element.innerText.trim());
+                utterance.lang = currentData.language || 'pt-BR';
+                utterance.rate = Number(settings.ttsRate) || 1.15;
+                if (voice) utterance.voice = voice;
+                utterance.onstart = () => {
+                    if (generation !== speechGeneration) return;
+                    document.querySelectorAll('.reading-active').forEach(active => active.classList.remove('reading-active'));
+                    element.classList.add('reading-active');
+                    element.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
+                };
+                utterance.onend = () => {
+                    if (generation !== speechGeneration) return;
+                    element.classList.remove('reading-active');
+                    completed += 1;
+                    if (completed !== elements.length) return;
+                    isSpeaking = false;
+                    [ui.tts, ui.ttsTop].forEach(button => { if (button) button.textContent = '🔊 Ouvir'; });
+                    updateFab();
+                    if (settings.autoAdvanceEnabled !== false) {
+                        markLessonCompleted();
+                        runtimeMessage({ type: 'AUTO_FINISH_READING' });
+                    }
+                };
+                utterance.onerror = utterance.onend;
+                synth.speak(utterance);
+            });
+        });
     }
 
     function toggleSpeech() {
-        if (isSpeaking) {
-            if (isPaused) {
-                synth.resume();
-                isPaused = false;
-            } else {
-                // Determine if we should Pause or Stop?
-                // Usually Toggle means Start/Stop for main button, but Pause/Resume for FAB
-                stopSpeaking();
-            }
-        }
+        if (isSpeaking) stopSpeaking();
         else startSpeaking();
-        updateFabState();
     }
 
-    // FAB Logic - Pause/Resume ONLY
     function togglePause() {
         if (!isSpeaking) return;
-
-        if (synth.paused || isPaused) {
-            synth.resume();
-            isPaused = false;
-        } else {
-            synth.pause();
-            isPaused = true;
-        }
-        updateFabState();
+        if (synth.paused || isPaused) { synth.resume(); isPaused = false; }
+        else { synth.pause(); isPaused = true; }
+        updateFab();
     }
 
-    if (ttsBtn) ttsBtn.addEventListener('click', toggleSpeech);
-    if (ttsBtnTop) ttsBtnTop.addEventListener('click', toggleSpeech);
-    if (fab) fab.addEventListener('click', togglePause);
-
-    if (finishBtn) {
-        finishBtn.addEventListener('click', () => {
-            stopSpeaking();
-            finish();
-        });
-    }
-    if (finishBtnTop) {
-        finishBtnTop.addEventListener('click', () => {
-            stopSpeaking();
-            finish();
-        });
+    function viewKey(data) {
+        return `${data?.lessonId || data?.url || ''}:${data?.isQuiz ? 'quiz' : 'text'}:${data?.html?.length || data?.options?.length || 0}`;
     }
 
-    // --- MESSAGING ---
-    chrome.runtime.onMessage.addListener((msg) => {
-        if (msg.type === 'UPDATE_STATE') {
-            // Core Update from Background
-            if (msg.mode) switchMode(msg.mode, msg.data);
-        }
-
-        // Shortcut Handler
-        if (msg.type === 'COMMAND_PLAY_PAUSE') {
-            console.log("Shortcut PLAY_PAUSE received. Mode:", currentMode, "isSpeaking:", isSpeaking);
-            if (currentMode === 'CONTENT') {
-                if (isSpeaking) togglePause();
-                else startSpeaking();
+    function recordLesson(data, type = data?.isQuiz ? 'quiz' : 'text') {
+        if (!data?.lessonId) return;
+        chrome.storage.local.get(['progressHistory'], result => {
+            const history = Array.isArray(result.progressHistory) ? result.progressHistory : [];
+            const existing = history.find(item => item.lessonId === data.lessonId && item.courseId === data.courseId);
+            if (existing) {
+                existing.title = data.title;
+                existing.url = data.url;
+                existing.lastOpenedAt = Date.now();
+                existing.type = type;
+            } else {
+                history.unshift({ lessonId: data.lessonId, courseId: data.courseId, title: data.title, url: data.url, type, lastOpenedAt: Date.now() });
             }
+            const trimmed = history.sort((a, b) => b.lastOpenedAt - a.lastOpenedAt).slice(0, 100);
+            chrome.storage.local.set({ progressHistory: trimmed });
+            renderHistory(trimmed);
+        });
+    }
+
+    function markLessonCompleted() {
+        if (!currentData?.lessonId) return;
+        chrome.storage.local.get(['progressHistory'], result => {
+            const history = Array.isArray(result.progressHistory) ? result.progressHistory : [];
+            const item = history.find(entry => entry.lessonId === currentData.lessonId && entry.courseId === currentData.courseId);
+            if (item) item.completedAt = Date.now();
+            chrome.storage.local.set({ progressHistory: history });
+            renderHistory(history);
+        });
+    }
+
+    function renderHistory(history) {
+        ui.history.replaceChildren();
+        (history || []).slice(0, 8).forEach(item => {
+            const li = document.createElement('li');
+            li.textContent = `${item.completedAt ? '✓ ' : ''}${item.title || item.lessonId}`;
+            ui.history.append(li);
+        });
+        if (!ui.history.children.length) {
+            const li = document.createElement('li');
+            li.textContent = 'Nenhuma aula registrada.';
+            ui.history.append(li);
         }
+    }
 
-        if (msg.type === 'SPEED_UPDATED') {
-            const speed = msg.speed;
-            const customBtn = document.getElementById('customSpeedBtn');
-            let isStandard = false;
+    function setSpeedUI(speed) {
+        let matched = false;
+        document.querySelectorAll('.speed-btn').forEach(button => {
+            if (button.id === 'customSpeedBtn') return;
+            const active = Math.abs(Number(button.dataset.speed) - Number(speed)) < 0.01;
+            button.classList.toggle('active', active);
+            if (active) matched = true;
+        });
+        const custom = byId('customSpeedBtn');
+        custom.classList.toggle('hidden', matched);
+        custom.classList.toggle('active', !matched);
+        if (!matched) { custom.dataset.speed = speed; custom.textContent = `${Number(speed).toFixed(2).replace(/0+$/, '').replace(/\.$/, '')}x`; }
+    }
 
-            // Update Standard Buttons
-            speedBtns.forEach(btn => {
-                if (btn.id === 'customSpeedBtn') return; // Skip custom
+    function renderText(data) {
+        const isLoading = AluraFlowCore.isLoadingState(data);
+        ui.text.classList.remove('hidden');
+        ui.quiz.classList.add('hidden');
+        ui.finish.closest('.reading-actions').classList.toggle('hidden', isLoading);
+        [ui.tts, ui.ttsTop, ui.finish, ui.finishTop].forEach(button => button?.classList.toggle('hidden', isLoading));
+        ui.title.textContent = data.title || 'Leitura';
+        safeHTML(ui.dynamic, data.html || '');
+        if (data.opinionHtml) { safeHTML(ui.opinionContent, data.opinionHtml); ui.opinion.classList.remove('hidden'); }
+        else { ui.opinion.classList.add('hidden'); ui.opinionContent.replaceChildren(); }
+        if (!isLoading) recordLesson(data);
 
-                const btnSpeed = parseFloat(btn.dataset.speed);
-                if (Math.abs(btnSpeed - speed) < 0.1) {
-                    btn.classList.add('active');
-                    isStandard = true;
-                } else {
-                    btn.classList.remove('active');
-                }
+        chrome.storage.local.get(['autoReadEnabled'], settings => {
+            if (settings.autoReadEnabled !== false && currentMode === 'CONTENT' && !currentData?.isQuiz && !AluraFlowCore.isLoadingState(currentData)) {
+                clearTimeout(autoReadTimer);
+                autoReadTimer = setTimeout(startSpeaking, 500);
+            }
+        });
+    }
+
+    function renderQuiz(data) {
+        stopSpeaking();
+        ui.text.classList.add('hidden');
+        ui.quiz.classList.remove('hidden');
+        ui.finish.closest('.reading-actions').classList.add('hidden');
+        [ui.tts, ui.ttsTop, ui.finish, ui.finishTop].forEach(button => button?.classList.add('hidden'));
+        ui.title.textContent = data.title || 'Quiz';
+        safeHTML(byId('quizQuestion'), data.questionHTML || 'Pergunta');
+        const instruction = byId('quizInstruction');
+        safeHTML(instruction, data.instructionHTML || 'Selecione a resposta.');
+        instruction.classList.remove('hidden');
+        const options = byId('quizOptions');
+        options.replaceChildren();
+
+        (data.options || []).forEach((option, index) => {
+            const button = document.createElement('button');
+            button.className = 'option-btn';
+            button.dataset.id = option.id;
+            button.setAttribute('aria-pressed', String(Boolean(option.isSelected)));
+            if (option.isSelected) button.classList.add('selected');
+            if (option.isCorrect) button.classList.add('correct');
+            if (option.isIncorrect) button.classList.add('wrong');
+
+            const row = document.createElement('span');
+            row.className = 'opt-main-row';
+            const letter = document.createElement('span');
+            letter.className = 'option-index';
+            letter.textContent = String.fromCharCode(65 + index);
+            const content = document.createElement('span');
+            safeHTML(content, option.html);
+            row.append(letter, content);
+            button.append(row);
+            button.addEventListener('click', () => {
+                if (data.isMultiple) button.classList.toggle('selected');
+                else options.querySelectorAll('.option-btn').forEach(other => other.classList.remove('selected', 'wrong'));
+                if (!data.isMultiple) button.classList.add('selected');
+                options.querySelectorAll('.option-btn').forEach(other => other.setAttribute('aria-pressed', String(other.classList.contains('selected'))));
+                lastClickedOptionId = option.id;
+                runtimeMessage({ type: 'SELECT_OPTION', optionId: option.id });
             });
+            options.append(button);
+        });
+        recordLesson(data);
+    }
 
-            // Handle Custom Button
-            if (!isStandard) {
-                if (customBtn) {
-                    customBtn.classList.remove('hidden');
-                    customBtn.classList.add('active');
-                    customBtn.textContent = (+speed.toFixed(2)) + 'x';
-                    customBtn.dataset.speed = speed;
-                }
-            } else {
-                if (customBtn) {
-                    customBtn.classList.add('hidden');
-                    customBtn.classList.remove('active');
-                }
-            }
+    function switchMode(mode, data) {
+        if (!mode || mode === 'NONE') {
+            ui.title.textContent = 'Abra uma aula da Alura';
+            ui.led.classList.remove('led-active');
+            return;
         }
-
-        // Player Updates
-        if (msg.type === 'VIDEO_STATE_CHANGED') {
-            if (currentMode === 'PLAYER') {
-                if (msg.status === 'playing') {
-                    videoStatusText.textContent = "Reproduzindo...";
-                    remotePlay.textContent = "⏸️";
-                } else {
-                    videoStatusText.textContent = "Pausado";
-                    remotePlay.textContent = "▶️";
-                }
-            }
+        const key = viewKey(data);
+        const changed = key !== currentViewKey;
+        if (changed || mode !== currentMode || data?.isQuiz) stopSpeaking();
+        currentMode = mode;
+        currentData = data || {};
+        currentViewKey = key;
+        ui.led.classList.add('led-active');
+        if (mode === 'PLAYER') {
+            ui.player.classList.remove('hidden');
+            ui.content.classList.add('hidden');
+            ui.title.textContent = data?.title || 'Vídeo';
+            ui.videoStatus.textContent = data?.status === 'playing' ? 'Reproduzindo…' : data?.status === 'loading' ? 'Carregando vídeo…' : 'Pausado';
+            recordLesson(data, 'video');
+        } else if (mode === 'CONTENT') {
+            ui.player.classList.add('hidden');
+            ui.content.classList.remove('hidden');
+            data?.isQuiz ? renderQuiz(data) : renderText(data || {});
         }
+    }
 
-        // Quiz Updates
-        if (msg.type === 'QUIZ_FEEDBACK_ERROR') {
-            if (currentMode === 'CONTENT' && lastClickedOptionId) {
-                const btn = document.querySelector(`.option-btn[data-id="${lastClickedOptionId}"]`);
-                if (btn) btn.classList.add('wrong');
-            }
-        }
-        if (msg.type === 'QUIZ_REVEAL_CORRECT' || msg.type === 'QUIZ_FEEDBACK_SUCCESS') {
-            if (msg.correctIds) {
-                msg.correctIds.forEach(id => {
-                    const btn = document.querySelector(`.option-btn[data-id="${id}"]`);
-                    if (btn) {
-                        btn.classList.remove('wrong');
-                        btn.classList.add('reveal-correct');
-                    }
-                });
-            }
-        }
+    function showCountdown(message) {
+        clearTimeout(undoTimer);
+        bannerMode = 'cancel';
+        ui.banner.classList.remove('hidden');
+        const reason = message.reason === 'quiz' ? 'Quiz concluído' : message.reason === 'video' ? 'Vídeo concluído' : 'Leitura concluída';
+        ui.bannerMessage.textContent = `${reason}. Avançando em ${Math.max(0, message.remaining)}s…`;
+        ui.bannerAction.textContent = 'Cancelar';
+    }
 
-        // Transition Handling (Smart Transitions)
-        if (msg.type === 'TRANSITION_START') {
-            console.log("Transition Started:", msg.predictedMode);
-            stopSpeaking(); // Immediate stop
+    function showUndo() {
+        bannerMode = 'undo';
+        ui.banner.classList.remove('hidden');
+        ui.bannerMessage.textContent = 'Aula avançada.';
+        ui.bannerAction.textContent = 'Desfazer';
+        clearTimeout(undoTimer);
+        undoTimer = setTimeout(() => ui.banner.classList.add('hidden'), 8000);
+    }
 
-            if (msg.predictedMode === 'PLAYER') {
-                // If not minimized (auto-min is off), show loading in player
-                switchMode('PLAYER', { title: "Carregando vídeo...", status: "loading" });
-            } else {
-                // Show loading state in Content
-                switchMode('CONTENT', {
-                    title: "Carregando...",
-                    html: "<div style='display:flex; justify-content:center; align-items:center; height:100%; color:#888;'><h2>⏳ Carregando próxima lição...</h2></div>",
-                    opinionHtml: null
-                });
-            }
+    ui.play.addEventListener('click', () => {
+        if (currentMode === 'PLAYER') ui.videoStatus.textContent = 'Tentando iniciar o vídeo…';
+        runtimeMessage({ type: 'COMMAND_PLAY_PAUSE' });
+    });
+    ui.prev.addEventListener('click', () => runtimeMessage({ type: 'COMMAND_PREV' }));
+    ui.next.addEventListener('click', () => runtimeMessage({ type: 'COMMAND_NEXT' }));
+    document.querySelectorAll('.speed-btn').forEach(button => button.addEventListener('click', () => {
+        const speed = Number(button.dataset.speed);
+        if (Number.isFinite(speed)) runtimeMessage({ type: 'UPDATE_SPEED', speed });
+    }));
+    [ui.tts, ui.ttsTop].forEach(button => button?.addEventListener('click', toggleSpeech));
+    ui.fab.addEventListener('click', togglePause);
+    [ui.finish, ui.finishTop].forEach(button => button?.addEventListener('click', () => {
+        stopSpeaking();
+        markLessonCompleted();
+        runtimeMessage({ type: 'FINISH_READING' });
+    }));
+    ui.bannerAction.addEventListener('click', () => {
+        if (bannerMode === 'undo') runtimeMessage({ type: 'COMMAND_PREV' });
+        else runtimeMessage({ type: 'CANCEL_AUTO_ADVANCE' });
+        ui.banner.classList.add('hidden');
+    });
+
+    chrome.runtime.onMessage.addListener(message => {
+        if (message.type === 'UPDATE_STATE') switchMode(message.mode, message.data);
+        else if (message.type === 'VIDEO_STATE_CHANGED' && currentMode === 'PLAYER') {
+            ui.videoStatus.textContent = message.status === 'playing' ? 'Reproduzindo…' : 'Pausado';
+            ui.play.textContent = message.status === 'playing' ? '⏸️' : '▶️';
+        } else if (message.type === 'SPEED_UPDATED') setSpeedUI(message.speed);
+        else if (message.type === 'COMMAND_PLAY_PAUSE' && currentMode === 'CONTENT') {
+            if (isSpeaking) togglePause(); else startSpeaking();
+        } else if (message.type === 'QUIZ_FEEDBACK_ERROR') {
+            const wrongIds = message.wrongIds?.length ? message.wrongIds : lastClickedOptionId !== null ? [lastClickedOptionId] : [];
+            wrongIds.forEach(id => byId('quizOptions').querySelector(`[data-id="${CSS.escape(String(id))}"]`)?.classList.add('wrong'));
+        } else if (message.type === 'QUIZ_FEEDBACK_SUCCESS' || message.type === 'QUIZ_REVEAL_CORRECT') {
+            (message.correctIds || []).forEach(id => byId('quizOptions').querySelector(`[data-id="${CSS.escape(String(id))}"]`)?.classList.add('reveal-correct'));
+            if (message.type === 'QUIZ_FEEDBACK_SUCCESS') markLessonCompleted();
+        } else if (message.type === 'AUTO_ADVANCE_COUNTDOWN') showCountdown(message);
+        else if (message.type === 'AUTO_ADVANCE_CANCELLED') ui.banner.classList.add('hidden');
+        else if (message.type === 'AUTO_ADVANCE_EXECUTED') showUndo();
+        else if (message.type === 'TRANSITION_START') {
+            stopSpeaking();
+            switchMode(message.predictedMode || 'CONTENT', { title: 'Carregando próxima aula…', status: 'loading', isLoading: true, html: '<p aria-live="polite">Carregando…</p>' });
+        } else if (message.type === 'SELECTOR_DIAGNOSTIC') {
+            ui.led.classList.remove('led-active');
+            ui.title.textContent = 'Aula não reconhecida';
+            ui.banner.classList.remove('hidden');
+            ui.bannerMessage.textContent = message.data?.message || 'A estrutura da página mudou.';
+            ui.bannerAction.textContent = 'Fechar';
+            bannerMode = 'close';
+        } else if (message.type === 'AUTOPLAY_BLOCKED' || message.type === 'VIDEO_PLAY_FAILED') {
+            ui.videoStatus.textContent = message.error === 'video-not-found' ? 'Player ainda não carregou. Tente novamente em instantes.' : 'O Firefox bloqueou a reprodução. Libere o autoplay para a Alura ou clique no player uma vez.';
         }
     });
 
-    // --- INITIAL LOAD ---
-    // Ask background for current state
-    chrome.runtime.sendMessage({ type: 'COMPANION_READY' }, (response) => {
-        if (response && response.mode) {
-            switchMode(response.mode, response.data);
-        } else {
-            // Fallback: Check local storage
-            chrome.storage.local.get(['currentReading', 'currentQuiz'], (res) => {
-                if (res.currentReading) {
-                    switchMode('CONTENT', res.currentReading);
-                } else {
-                    switchMode('PLAYER', { title: "Aguardando conteúdo...", status: "ready" });
-                }
-            });
-        }
+    chrome.storage.local.get(['progressHistory', 'playbackSpeed'], result => {
+        renderHistory(result.progressHistory || []);
+        setSpeedUI(result.playbackSpeed || 1);
     });
+    chrome.storage.onChanged.addListener((changes, area) => {
+        if (area === 'local' && changes.autoReadEnabled?.newValue === false) {
+            clearTimeout(autoReadTimer);
+            autoReadTimer = null;
+        }
+        if (area === 'local' && changes.progressHistory) renderHistory(changes.progressHistory.newValue || []);
+    });
+    runtimeMessage({ type: 'COMPANION_READY' }).then(response => switchMode(response.mode, response.data));
 });

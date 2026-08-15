@@ -1,114 +1,80 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Alura Flow</title>
   <style>
-    :root {
-      --bg-color: #f4f4f9;
-      --text-color: #333;
-      --accent-color: #2A7AE4;
-      --subtext-color: #555;
-      --border-color: #ddd;
-    }
-
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --bg-color: #202023;
-        --text-color: #e0e0e0;
-        --accent-color: #5CA4FF;
-        --subtext-color: #bbb;
-        --border-color: #444;
-      }
-    }
-
-    body {
-      width: 250px;
-      padding: 15px;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: var(--bg-color);
-      color: var(--text-color);
-    }
-
-    h3 {
-      margin-top: 0;
-      color: var(--accent-color);
-      text-align: center;
-    }
-
-    .control-group {
-      margin-bottom: 15px;
-      text-align: center;
-    }
-
-    label {
-      display: block;
-      margin-bottom: 5px;
-      font-weight: bold;
-    }
-
-    input[type=range] {
-      width: 100%;
-      cursor: pointer;
-    }
-
-    .value-display {
-      font-size: 1.2em;
-      font-weight: bold;
-      color: var(--subtext-color);
-    }
-
-    .footer {
-      font-size: 0.8em;
-      text-align: center;
-      color: var(--subtext-color);
-      margin-top: 20px;
-    }
-
-    /* Melhoria visual para separador no modo escuro */
-    .separator {
-      border-top: 1px solid var(--border-color);
-    }
+    :root { color-scheme: light dark; --bg:#f7f8fb; --card:#fff; --text:#202124; --muted:#5f6368; --accent:#1769d2; --border:#dfe3ea; --danger:#b3261e; }
+    @media (prefers-color-scheme:dark) { :root { --bg:#17181b; --card:#23252a; --text:#f1f3f4; --muted:#bdc1c6; --accent:#7bb1ff; --border:#3c4048; --danger:#ffb4ab; } }
+    * { box-sizing:border-box; }
+    body { width:330px; margin:0; padding:14px; font:13px/1.4 system-ui,sans-serif; background:var(--bg); color:var(--text); }
+    h1 { margin:0 0 12px; color:var(--accent); font-size:19px; }
+    h2 { margin:0 0 8px; font-size:13px; }
+    .card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:11px; margin-bottom:10px; }
+    .row { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:8px 0; }
+    .stack { display:grid; gap:6px; }
+    label { font-weight:600; }
+    label.inline { font-weight:400; flex:1; }
+    select, input[type=range] { width:100%; }
+    select, button { border:1px solid var(--border); border-radius:7px; background:var(--card); color:var(--text); padding:7px; }
+    button { cursor:pointer; font-weight:600; }
+    button.primary { background:var(--accent); color:white; border-color:var(--accent); }
+    button:focus-visible, select:focus-visible, input:focus-visible { outline:3px solid color-mix(in srgb, var(--accent) 45%, transparent); outline-offset:2px; }
+    output { min-width:42px; text-align:right; color:var(--accent); font-weight:700; }
+    .muted { color:var(--muted); font-size:12px; }
+    #sessionStatus[data-state="error"] { color:var(--danger); }
+    .actions { display:flex; gap:7px; }
+    .actions button { flex:1; }
+    .shortcut { font-family:ui-monospace,monospace; }
+    @media (prefers-reduced-motion:reduce) { * { scroll-behavior:auto!important; transition:none!important; } }
   </style>
 </head>
-
 <body>
-  <h3>Alura Flow</h3>
+  <h1>Alura Flow</h1>
 
-  <div class="control-group">
-    <label for="speedSlider">Velocidade de reprodução</label>
-    <div class="value-display" id="speedValue">1.0x</div>
-    <input type="range" id="speedSlider" min="0.5" max="4.0" step="0.25" value="1.0">
-  </div>
-
-  <div class="control-group" style="text-align: left; margin-left: 10px;">
-    <input type="checkbox" id="autoAdvanceToggle" checked>
-    <label for="autoAdvanceToggle" style="display: inline; font-weight: normal;">Habilitar auto-avançar</label>
-  </div>
-
-  <div class="control-group" style="text-align: left; margin-left: 10px;">
-    <input type="checkbox" id="autoReadToggle" checked>
-    <label for="autoReadToggle" style="display: inline; font-weight: normal;">Ler textos automaticamente</label>
-  </div>
-
-  <div class="control-group" style="text-align: left; margin-left: 10px;">
-    <input type="checkbox" id="minimizeToggle" checked>
-    <label for="minimizeToggle" style="display: inline; font-weight: normal;">Minimizar popup durante video</label>
-  </div>
-
-  <div class="control-group separator" style="text-align: left; margin-left: 10px; padding-top: 10px;">
-    <input type="checkbox" id="shortcutsToggle" checked>
-    <label for="shortcutsToggle" style="display: inline; font-weight: bold;">Habilitar atalhos</label>
-
-    <div style="font-size: 0.85em; color: #666; margin-top: 5px; margin-left: 20px;">
-      <div><b>Ctrl+Alt+N</b>: Proxima lição</div>
-      <div><b>Ctrl+Alt+P</b>: Play/Pausar</div>
-      <div><b>Ctrl+Alt+S</b>: Alterar velocidade</div>
+  <section class="card" aria-labelledby="sessionHeading">
+    <h2 id="sessionHeading">Curso controlado</h2>
+    <div class="stack">
+      <label class="muted" for="controlledTab">Aba da Alura</label>
+      <select id="controlledTab"><option value="">Procurando abas…</option></select>
+      <div id="sessionStatus" class="muted" role="status" aria-live="polite">Conectando…</div>
+      <div class="actions">
+        <button id="refreshTabs">Atualizar</button>
+        <button id="openCompanion" class="primary">Abrir companion</button>
+      </div>
     </div>
-  </div>
+  </section>
 
+  <section class="card" aria-labelledby="playbackHeading">
+    <h2 id="playbackHeading">Reprodução</h2>
+    <div class="row"><label for="speedSlider">Velocidade</label><output id="speedValue">1x</output></div>
+    <input type="range" id="speedSlider" min="0.5" max="4" step="0.25" value="1">
+    <div class="row"><input type="checkbox" id="perCourseToggle"><label class="inline" for="perCourseToggle">Lembrar velocidade por curso</label></div>
+    <div class="row"><input type="checkbox" id="autoPlayToggle"><label class="inline" for="autoPlayToggle">Iniciar vídeos automaticamente</label></div>
+    <div class="row"><input type="checkbox" id="autoAdvanceToggle"><label class="inline" for="autoAdvanceToggle">Avançar automaticamente</label></div>
+    <div class="row"><label for="advanceDelay">Contagem regressiva</label><select id="advanceDelay" style="width:auto"><option value="0">Imediato</option><option value="3">3 s</option><option value="5">5 s</option><option value="10">10 s</option><option value="15">15 s</option></select></div>
+    <div class="row"><input type="checkbox" id="minimizeToggle"><label class="inline" for="minimizeToggle">Minimizar durante vídeos</label></div>
+  </section>
 
+  <section class="card" aria-labelledby="voiceHeading">
+    <h2 id="voiceHeading">Leitura em voz alta</h2>
+    <div class="row"><input type="checkbox" id="autoReadToggle"><label class="inline" for="autoReadToggle">Ler textos automaticamente</label></div>
+    <label class="muted" for="voiceSelect">Voz</label>
+    <select id="voiceSelect"><option value="">Voz automática do idioma</option></select>
+    <div class="row"><label for="ttsRate">Ritmo da voz</label><output id="ttsRateValue">1.15x</output></div>
+    <input type="range" id="ttsRate" min="0.5" max="2" step="0.05" value="1.15">
+  </section>
+
+  <section class="card" aria-labelledby="accessHeading">
+    <h2 id="accessHeading">Atalhos e progresso</h2>
+    <div class="row"><input type="checkbox" id="shortcutsToggle"><label class="inline" for="shortcutsToggle">Habilitar atalhos globais</label></div>
+    <div class="muted"><span class="shortcut">Ctrl+Alt+P</span> reproduzir · <span class="shortcut">Ctrl+Alt+N</span> próxima · <span class="shortcut">Ctrl+Alt+S</span> velocidade</div>
+    <p id="shortcutStatus" class="muted" role="status" aria-live="polite">Verificando o atalho de velocidade…</p>
+    <button id="repairSpeedShortcut">Restaurar Ctrl+Alt+S</button>
+    <p id="progressSummary" class="muted" aria-live="polite">Nenhum progresso local.</p>
+    <button id="clearHistory">Limpar histórico local</button>
+  </section>
   <script src="popup.js"></script>
 </body>
-
 </html>

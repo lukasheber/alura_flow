@@ -11,12 +11,23 @@ A **Alura Flow** resolve isso trazendo o curso até você, e não o contrário. 
 
 ## Funcionalidades Principais
 
+### Novidades da versão 2.1
+
+* **Sessão segura por aba:** escolha exatamente qual curso o companion deve controlar.
+* **Avanço com contagem regressiva:** cancele antes de avançar ou desfaça por oito segundos.
+* **Perfis por curso:** a velocidade pode ser lembrada separadamente para cada curso.
+* **Leitura configurável:** escolha a voz e ajuste o ritmo da narração sem alterar a velocidade dos vídeos.
+* **Progresso local:** as últimas aulas abertas e concluídas ficam registradas somente no navegador.
+* **Diagnóstico de seletores:** quando a Alura muda a estrutura de uma aula, a extensão mostra um aviso em vez de falhar silenciosamente.
+
 ### 1. Modo "Podcast" & Controle Global
 
 Não procure mais a aba da Alura perdida entre outras 20 abas.
 
 * **Auto-Play & Auto-Advance:** O próximo vídeo começa automaticamente.
 * **Atalhos Globais:** Pause, avance ou mude a velocidade de qualquer lugar no navegador.
+
+O fallback de `Ctrl+Alt+S` observa somente essa combinação de teclas nas páginas. Nenhum texto, formulário ou conteúdo dos sites é coletado.
 
 ### 2. Leitura Focada (Clean UI)
 
@@ -48,7 +59,7 @@ Os atalhos funcionam mesmo que você esteja navegando em outro site (ex: lendo d
 | --- | --- | --- |
 | `Ctrl` + `Alt` + **P** | **Play / Pause** | Pausa a reprodução do vídeo atual. |
 | `Ctrl` + `Alt` + **N** | **Next Lesson** | Avança para a próxima lição (vídeo ou texto). |
-| `Ctrl` + `Alt` + **S** | **Speed Cycle** | Alterna velocidades (1.0x → 1.5x → 2.0x). |
+| `Ctrl` + `Alt` + **S** | **Speed Cycle** | Alterna velocidades (1x → 1,25x → 1,5x → 2x). |
 
 ---
 
@@ -68,6 +79,23 @@ Ao clicar no ícone da extensão na barra de ferramentas, você pode:
 * Ajustar a velocidade padrão de reprodução (0.5x até 4.0x).
 * Ativar/Desativar o avanço automático.
 * Habilitar/Desabilitar os atalhos globais.
+* Escolher a aba/curso controlado.
+* Definir o atraso do avanço automático, a voz e o ritmo da leitura.
+* Limpar o histórico de progresso local.
+
+## Validação para desenvolvimento
+
+Os testes de regressão usam apenas o Node.js e cobrem a identificação de respostas corretas/incorretas, quizzes de múltipla escolha, roteamento de abas e identidade das aulas:
+
+```bash
+node --test tests/core.test.mjs
+```
+
+Para validar o pacote com as regras oficiais de extensões do Firefox:
+
+```bash
+web-ext lint --source-dir .
+```
 
 ---
 

@@ -1,324 +1,442 @@
-// Alura Flow - Background Service Worker
-// Manages the single persistent Companion Window.
+// Alura Flow - background controller
+'use strict';
 
-// Note: companionWindowId variable is removed in favor of chrome.storage.session
-// to survive Service Worker restarts.
-
-// --- WINDOW MANAGEMENT ---
-
-// --- WINDOW MANAGEMENT ---
+const COMPANION_URL = chrome.runtime.getURL('reading.html');
+const ALURA_URL_PATTERN = '*://*.alura.com.br/*';
+const DEFAULT_SPEED_SHORTCUT = 'Ctrl+Alt+S';
 let isCreatingWindow = false;
-let creationQueue = [];
+let lastSpeedCycleAt = 0;
+const creationQueue = [];
 
-function processCreationQueue(win) {
-    while (creationQueue.length > 0) {
-        const cb = creationQueue.shift();
-        if (cb) cb(win);
+function flushCreationQueue(win) {
+    while (creationQueue.length) {
+        const callback = creationQueue.shift();
+        try { callback(win || null); } catch (error) { console.error('Companion callback failed:', error); }
     }
 }
 
+function findCompanionWindow(callback) {
+    chrome.windows.getAll({ populate: true }, windows => {
+        if (chrome.runtime.lastError) {
+            callback(null);
+            return;
+        }
+        const found = windows.find(win => win.type === 'popup' && win.tabs?.some(tab => tab.url === COMPANION_URL));
+        callback(found || null);
+    });
+}
+
 function getCompanionWindow(callback) {
-    // 1. Race Lock: If creating, wait.
     if (isCreatingWindow) {
         creationQueue.push(callback);
         return;
     }
 
-    chrome.storage.session.get(['companionWindowId'], (result) => {
+    chrome.storage.session.get(['companionWindowId'], result => {
         const id = result.companionWindowId;
-        if (id) {
-            chrome.windows.get(id, (win) => {
-                if (chrome.runtime.lastError || !win) {
-                    // Window ID stale, try finding by matching URL/Type to handle reload orphans
-                    findOrphanedWindow((orphan) => {
-                        if (orphan) {
-                            chrome.storage.session.set({ companionWindowId: orphan.id });
-                            callback(orphan);
-                        } else {
-                            chrome.storage.session.remove('companionWindowId');
-                            callback(null);
-                        }
-                    });
-                } else {
-                    callback(win);
-                }
-            });
-        } else {
-            // No ID, but maybe an orphan exists?
-            findOrphanedWindow((orphan) => {
-                if (orphan) {
-                    chrome.storage.session.set({ companionWindowId: orphan.id });
-                    callback(orphan);
-                } else {
-                    callback(null);
-                }
-            });
+        if (!Number.isInteger(id)) {
+            findCompanionWindow(callback);
+            return;
         }
+
+        chrome.windows.get(id, { populate: true }, win => {
+            if (!chrome.runtime.lastError && win?.tabs?.some(tab => tab.url === COMPANION_URL)) {
+                callback(win);
+                return;
+            }
+            chrome.storage.session.remove('companionWindowId');
+            findCompanionWindow(callback);
+        });
     });
 }
 
-function findOrphanedWindow(cb) {
-    // Removed specific windowTypes filter to be broader
-    // NEED "tabs" permission for this to see URLs of other windows effectively? Yes.
-    chrome.windows.getAll({ populate: true }, (wins) => {
-        const found = wins.find(w => w.tabs && w.tabs.some(t => t.url && t.url.includes('reading.html')));
-        cb(found || null);
-    });
+function companionTab(win) {
+    return win?.tabs?.find(tab => tab.url === COMPANION_URL) || null;
 }
 
-function createCompanionWindow(initialState = null) {
-    if (isCreatingWindow) return; // Should be handled by getCompanionWindow guard, but safety check.
+function sendToCompanion(message) {
+    chrome.runtime.sendMessage({ ...message, target: 'COMPANION' }, () => void chrome.runtime.lastError);
+}
+
+function createCompanionWindow(initialState, callback = () => {}) {
+    if (isCreatingWindow) {
+        creationQueue.push(callback);
+        return;
+    }
     isCreatingWindow = true;
 
     chrome.windows.create({
-        url: 'reading.html',
+        url: COMPANION_URL,
         type: 'popup',
-        width: 500,
-        height: 600,
+        width: 520,
+        height: 680,
         focused: true
-    }, (win) => {
-        const id = win.id;
-        console.log("Companion Window Created:", id);
-        chrome.storage.session.set({ companionWindowId: id });
-
-        // Unlock
+    }, win => {
+        const error = chrome.runtime.lastError;
         isCreatingWindow = false;
-        processCreationQueue(win);
-
-        // If we have initial state, send it after a short delay to ensure load
-        if (initialState) {
-            setTimeout(() => {
-                chrome.tabs.query({ windowId: id }, (tabs) => {
-                    if (tabs && tabs.length > 0) chrome.tabs.sendMessage(tabs[0].id, initialState);
-                });
-            }, 1000);
+        if (error || !win?.id) {
+            console.error('Unable to create companion window:', error?.message || 'Unknown error');
+            flushCreationQueue(null);
+            callback(null);
+            return;
         }
+
+        chrome.storage.session.set({ companionWindowId: win.id });
+        flushCreationQueue(win);
+        callback(win);
+        if (initialState) setTimeout(() => sendToCompanion(initialState), 150);
     });
 }
 
-function ensureCompanionWindow(stateMsg, shouldFocus = false) {
-    getCompanionWindow((win) => {
-        if (win) {
-            // Update Existing
-            console.log("Updating Companion Window...", stateMsg);
-            chrome.tabs.query({ windowId: win.id }, (tabs) => {
-                if (tabs && tabs.length > 0) {
-                    chrome.tabs.sendMessage(tabs[0].id, stateMsg);
-                }
-            });
+function ensureCompanionWindow(message, focus = false) {
+    getCompanionWindow(win => {
+        if (!win) {
+            createCompanionWindow(message);
+            return;
+        }
+        sendToCompanion(message);
+        if (focus) chrome.windows.update(win.id, { state: 'normal', focused: true });
+    });
+}
 
-            if (shouldFocus) {
-                chrome.windows.update(win.id, { focused: true, drawAttention: true });
+function getAluraTabs(callback) {
+    chrome.tabs.query({ url: ALURA_URL_PATTERN }, tabs => callback(tabs || []));
+}
+
+function getControlledTab(callback) {
+    chrome.storage.session.get(['controlledTabId'], result => {
+        getAluraTabs(tabs => {
+            const selected = AluraFlowCore.chooseControlledTab(tabs, result.controlledTabId);
+            if (!selected) {
+                chrome.storage.session.remove(['controlledTabId', 'latestState']);
+                callback(null);
+                return;
             }
-        } else {
-            // Create New
-            console.log("Creating Companion Window for state...", stateMsg);
-            createCompanionWindow(stateMsg);
-        }
+            if (selected.id !== result.controlledTabId) chrome.storage.session.set({ controlledTabId: selected.id });
+            callback(selected);
+        });
     });
 }
 
-// --- MESSAGE HANDLING ---
+function routeToControlledTab(payload, callback = () => {}) {
+    getControlledTab(tab => {
+        if (!tab) {
+            callback({ ok: false, error: 'Nenhuma aba da Alura encontrada.' });
+            return;
+        }
+        chrome.tabs.sendMessage(tab.id, payload, response => {
+            const error = chrome.runtime.lastError;
+            callback(error ? { ok: false, error: error.message } : { ok: true, tabId: tab.id, response });
+        });
+    });
+}
 
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    // 1. STATE UPDATES (From Content Script)
-    // 1. STATE UPDATES (From Content Script)
-    if (message.type === 'UPDATE_STATE') {
+function storePlaybackSpeed(rawSpeed, courseId, callback = () => {}) {
+    const speed = Number(rawSpeed);
+    if (!Number.isFinite(speed) || speed <= 0) {
+        callback({ ok: false, error: 'Velocidade inválida.' });
+        return;
+    }
+
+    chrome.storage.local.get(['perCourseSettings', 'courseProfiles'], local => {
+        const update = { playbackSpeed: speed };
+        if (local.perCourseSettings !== false && courseId) {
+            const courseProfiles = { ...(local.courseProfiles || {}) };
+            courseProfiles[courseId] = { ...(courseProfiles[courseId] || {}), playbackSpeed: speed };
+            update.courseProfiles = courseProfiles;
+        }
+        chrome.storage.local.set(update, () => callback({ ok: true, speed }));
+    });
+}
+
+function applyPlaybackSpeed(rawSpeed, callback = () => {}) {
+    chrome.storage.session.get(['latestState'], session => {
+        const courseId = session.latestState?.data?.courseId;
+        storePlaybackSpeed(rawSpeed, courseId, stored => {
+            if (!stored.ok) {
+                callback(stored);
+                return;
+            }
+            routeToControlledTab({ type: 'UPDATE_SPEED', speed: stored.speed }, routed => {
+                sendToCompanion({ type: 'SPEED_UPDATED', speed: stored.speed });
+                callback({ ...routed, speed: stored.speed });
+            });
+        });
+    });
+}
+
+function cyclePlaybackSpeed(callback = () => {}) {
+    const now = Date.now();
+    if (now - lastSpeedCycleAt < 350) {
+        callback({ ok: true, duplicate: true });
+        return;
+    }
+    lastSpeedCycleAt = now;
+
+    chrome.storage.local.get(['playbackSpeed', 'perCourseSettings', 'courseProfiles'], local => {
+        chrome.storage.session.get(['latestState'], session => {
+            const courseId = session.latestState?.data?.courseId;
+            const profileSpeed = local.perCourseSettings !== false && courseId
+                ? local.courseProfiles?.[courseId]?.playbackSpeed
+                : null;
+            const current = Number(profileSpeed ?? local.playbackSpeed ?? 1);
+            applyPlaybackSpeed(AluraFlowCore.nextPlaybackSpeed(current), callback);
+        });
+    });
+}
+
+function ensureCycleSpeedShortcut(force = false, callback = () => {}) {
+    if (!chrome.commands?.getAll || !chrome.commands?.update) {
+        callback({ ok: false, error: 'Este Firefox não permite restaurar atalhos automaticamente.' });
+        return;
+    }
+
+    chrome.commands.getAll(commands => {
+        const command = commands?.find(item => item.name === 'cycle-speed');
+        if (!command) {
+            callback({ ok: false, error: 'Comando de velocidade não encontrado.' });
+            return;
+        }
+        if (!force && command.shortcut) {
+            callback({ ok: true, shortcut: command.shortcut, changed: false });
+            return;
+        }
+        chrome.commands.update({ name: 'cycle-speed', shortcut: DEFAULT_SPEED_SHORTCUT }, () => {
+            const error = chrome.runtime.lastError;
+            callback(error
+                ? { ok: false, error: error.message }
+                : { ok: true, shortcut: DEFAULT_SPEED_SHORTCUT, changed: true });
+        });
+    });
+}
+
+function acceptStateFromTab(message, sender, callback) {
+    const tab = sender.tab;
+    if (!tab?.id || !tab.url?.includes('alura.com.br')) {
+        callback(false);
+        return;
+    }
+
+    chrome.storage.session.get(['controlledTabId'], session => {
+        const commit = () => {
+            const latestState = { ...message, sourceTabId: tab.id, sourceUrl: tab.url, receivedAt: Date.now() };
+            chrome.storage.session.set({ controlledTabId: tab.id, latestState, diagnostic: null });
+            callback(true);
+        };
+        if (message.forceBind || session.controlledTabId === tab.id) {
+            commit();
+            return;
+        }
+        if (Number.isInteger(session.controlledTabId)) {
+            callback(false);
+            return;
+        }
+        getAluraTabs(tabs => {
+            const preferred = AluraFlowCore.chooseControlledTab(tabs);
+            if (preferred?.id === tab.id) commit();
+            else callback(false);
+        });
+    });
+}
+
+function handleStateUpdate(message, sender) {
+    acceptStateFromTab(message, sender, accepted => {
+        if (!accepted) return;
+
         if (message.mode === 'PLAYER') {
-            chrome.storage.local.get(['autoMinimizeEnabled'], (result) => {
-                if (result.autoMinimizeEnabled !== false) {
-                    getCompanionWindow((win) => {
+            chrome.storage.local.get(['autoMinimizeEnabled'], settings => {
+                if (settings.autoMinimizeEnabled !== false) {
+                    getCompanionWindow(win => {
                         if (win) chrome.windows.update(win.id, { state: 'minimized' });
                     });
                 } else {
-                    // Update content but don't force focus, ensure it's normal (not minimized)
-                    getCompanionWindow((win) => {
-                        if (win) {
-                            if (win.state === 'minimized') {
-                                chrome.windows.update(win.id, { state: 'normal', drawAttention: false });
-                            }
-                            // Send data
-                            chrome.tabs.query({ windowId: win.id }, (tabs) => {
-                                if (tabs && tabs.length > 0) chrome.tabs.sendMessage(tabs[0].id, message);
-                            });
-                        } else {
-                            // Regression Fix: If window is missing in PLAYER mode (and we aren't minimizing), create it!
-                            createCompanionWindow(message);
-                        }
-                    });
+                    ensureCompanionWindow(message, false);
                 }
             });
+            return;
         }
-        else if (message.mode === 'CONTENT') {
-            // Force open/restore for Reading/Quiz
-            getCompanionWindow((win) => {
-                if (win) {
-                    console.log("Restoring Companion Window for Content...");
-                    // Force Normal State + Focus
-                    chrome.windows.update(win.id, { state: 'normal', focused: true, drawAttention: true });
-                    // Send Data
-                    chrome.tabs.query({ windowId: win.id }, (tabs) => {
-                        if (tabs && tabs.length > 0) chrome.tabs.sendMessage(tabs[0].id, message);
-                    });
-                } else {
-                    createCompanionWindow(message);
-                }
-            });
-        }
-    }
 
-    if (message.type === 'SPEED_UPDATED') {
-        // Persist
-        chrome.storage.local.set({ playbackSpeed: message.speed });
-        // Forward to Companion Window
-        getCompanionWindow((win) => {
-            if (win) {
-                chrome.tabs.query({ windowId: win.id }, (tabs) => {
-                    if (tabs && tabs.length > 0) chrome.tabs.sendMessage(tabs[0].id, message);
-                });
-            }
-        });
-    }
-
-    // 2. PREPARE READING (Video Ended)
-    if (message.type === 'PREPARE_READING_MODE') {
-        // Just ensure it's open and maybe focused slightly
-        getCompanionWindow((win) => {
-            if (win) {
-                chrome.storage.session.get(['companionWindowId'], (res) => {
-                    if (res.companionWindowId) chrome.windows.update(res.companionWindowId, { focused: true });
-                });
-            }
-        });
-    }
-
-    // 3. COMPANION REQUESTS (From Companion Window)
-    if (message.type === 'COMPANION_READY') {
-        // The window just opened and wants state.
-        // We'll ask the active tab to re-report.
-        chrome.tabs.query({ active: true, currentWindow: false }, (tabs) => {
-            // Find Alura tab
-            const aluraTab = tabs.find(t => t.url && t.url.includes('alura.com.br'));
-            if (aluraTab) {
-                chrome.tabs.sendMessage(aluraTab.id, { type: 'COMPANION_READY' });
-            } else {
-                // Try all tabs
-                chrome.tabs.query({ url: "*://*.alura.com.br/*" }, (aluraTabs) => {
-                    if (aluraTabs && aluraTabs.length > 0) {
-                        chrome.tabs.sendMessage(aluraTabs[0].id, { type: 'COMPANION_READY' });
-                    }
-                });
-            }
-        });
-        sendResponse({ mode: 'NONE' }); // Async response placeholder
-    }
-
-    // 4. ROUTING (Video Controls, Quiz Selection, etc)
-    // These specific messages need to go TO the Content Script FROM the Companion
-    const routeToContent = [
-        'COMMAND_PLAY_PAUSE',
-        'COMMAND_NEXT',
-        'COMMAND_PREV',
-        'UPDATE_SPEED',
-        'SELECT_OPTION',
-        'FINISH_READING'
-    ];
-
-    if (routeToContent.includes(message.type)) {
-        sendToActiveAluraTab(message);
-    }
-});
-
-function sendToActiveAluraTab(payload) {
-    chrome.tabs.query({ url: "*://*.alura.com.br/*" }, (tabs) => {
-        // Prioritize last focused
-        let target = tabs.find(t => t.active && t.lastAccessed);
-        if (!target && tabs.length > 0) target = tabs[0];
-
-        if (target) {
-            chrome.tabs.sendMessage(target.id, payload);
-        }
+        if (message.mode === 'CONTENT') ensureCompanionWindow(message, true);
     });
 }
 
-// --- KEYBOARD SHORTCUTS ---
-chrome.commands.onCommand.addListener((command) => {
-    let msgType = '';
-    if (command === 'next-lesson') msgType = 'COMMAND_NEXT';
-    if (command === 'play-pause') msgType = 'COMMAND_PLAY_PAUSE';
-    if (command === 'cycle-speed') msgType = 'COMMAND_CYCLE_SPEED';
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (!message?.type) return false;
 
-    if (msgType) {
-        // Send to BOTH (Companion might need to update UI, but mainly Content handles logic)
-        sendToActiveAluraTab({ type: msgType });
+    if (message.type === 'UPDATE_STATE') {
+        handleStateUpdate(message, sender);
+        return false;
+    }
 
-        if (msgType === 'COMMAND_PLAY_PAUSE' || msgType === 'COMMAND_CYCLE_SPEED') {
-            getCompanionWindow((win) => {
-                if (win) {
-                    chrome.tabs.query({ windowId: win.id }, (tabs) => {
-                        if (tabs && tabs.length > 0) {
-                            chrome.tabs.sendMessage(tabs[0].id, { type: msgType });
-                        }
-                    });
-                }
+    if (message.type === 'COMPANION_READY') {
+        chrome.storage.session.get(['latestState'], result => {
+            sendResponse(result.latestState || { mode: 'NONE' });
+            routeToControlledTab({ type: 'COMPANION_READY' });
+        });
+        return true;
+    }
+
+    if (message.type === 'GET_SESSION_STATUS') {
+        chrome.storage.session.get(['controlledTabId', 'latestState', 'diagnostic'], session => {
+            getAluraTabs(tabs => sendResponse({
+                controlledTabId: session.controlledTabId,
+                latestState: session.latestState || null,
+                diagnostic: session.diagnostic || null,
+                tabs: tabs.map(tab => ({ id: tab.id, title: tab.title, url: tab.url, active: tab.active, lastAccessed: tab.lastAccessed }))
+            }));
+        });
+        return true;
+    }
+
+    if (message.type === 'SET_CONTROLLED_TAB') {
+        const tabId = Number(message.tabId);
+        chrome.tabs.get(tabId, tab => {
+            if (chrome.runtime.lastError || !tab?.url?.includes('alura.com.br')) {
+                sendResponse({ ok: false, error: 'A aba selecionada não é uma página da Alura.' });
+                return;
+            }
+            chrome.storage.session.set({ controlledTabId: tabId, latestState: null, diagnostic: null }, () => {
+                chrome.tabs.sendMessage(tabId, { type: 'COMPANION_READY', forceBind: true });
+                sendResponse({ ok: true });
+            });
+        });
+        return true;
+    }
+
+    if (message.type === 'OPEN_COMPANION') {
+        chrome.storage.session.get(['latestState'], result => ensureCompanionWindow(result.latestState || null, true));
+        sendResponse({ ok: true });
+        return false;
+    }
+
+    if (message.type === 'UPDATE_SPEED') {
+        applyPlaybackSpeed(message.speed, sendResponse);
+        return true;
+    }
+
+    if (message.type === 'CYCLE_SPEED_REQUEST') {
+        chrome.storage.local.get(['shortcutsEnabled'], settings => {
+            if (settings.shortcutsEnabled === false) {
+                sendResponse({ ok: false, error: 'Atalhos desabilitados.' });
+                return;
+            }
+            cyclePlaybackSpeed(sendResponse);
+        });
+        return true;
+    }
+
+    if (message.type === 'REPAIR_SPEED_SHORTCUT') {
+        ensureCycleSpeedShortcut(true, sendResponse);
+        return true;
+    }
+
+    const routedCommands = new Set([
+        'COMMAND_PLAY_PAUSE', 'COMMAND_NEXT', 'COMMAND_PREV', 'COMMAND_CYCLE_SPEED',
+        'UPDATE_AUTO_ADVANCE', 'SELECT_OPTION', 'FINISH_READING', 'AUTO_FINISH_READING', 'CANCEL_AUTO_ADVANCE'
+    ]);
+    if (routedCommands.has(message.type)) {
+        routeToControlledTab(message, sendResponse);
+        return true;
+    }
+
+    if (message.type === 'SPEED_UPDATED') {
+        const courseId = message.courseId || null;
+        storePlaybackSpeed(message.speed, courseId, stored => {
+            if (stored.ok) sendToCompanion({ type: 'SPEED_UPDATED', speed: stored.speed });
+        });
+        return false;
+    }
+
+    if (message.type === 'SELECTOR_DIAGNOSTIC') {
+        if (sender.tab?.id) {
+            chrome.storage.session.get(['controlledTabId'], session => {
+                if (session.controlledTabId === sender.tab.id) chrome.storage.session.set({ diagnostic: message });
             });
         }
+        return false;
     }
-});
 
-// 5. TRANSITION HANDLING
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.type === 'PREPARE_READING_MODE') {
+        getCompanionWindow(win => {
+            if (win) chrome.windows.update(win.id, { state: 'normal', focused: true });
+        });
+        return false;
+    }
+
     if (message.type === 'TRANSITION_START') {
-        const predictedMode = message.predictedMode;
-
-        chrome.storage.local.get(['autoMinimizeEnabled'], (res) => {
-            if (res.autoMinimizeEnabled !== false && predictedMode === 'PLAYER') {
-                // Optimistic Minimize!
-                getCompanionWindow((win) => {
-                    if (win) {
-                        console.log("Smart Transition: Optimistically Minimizing...");
-                        chrome.windows.update(win.id, { state: 'minimized' });
-                    }
-                });
+        chrome.storage.local.get(['autoMinimizeEnabled'], settings => {
+            if (settings.autoMinimizeEnabled !== false && message.predictedMode === 'PLAYER') {
+                getCompanionWindow(win => { if (win) chrome.windows.update(win.id, { state: 'minimized' }); });
             } else {
-                // Forward to Companion to show "Loading..."
-                getCompanionWindow((win) => {
-                    if (win) {
-                        chrome.tabs.query({ windowId: win.id }, (tabs) => {
-                            if (tabs && tabs.length > 0) chrome.tabs.sendMessage(tabs[0].id, message);
-                        });
-                    }
-                });
+                sendToCompanion(message);
             }
         });
+        return false;
+    }
+
+    return false;
+});
+
+chrome.commands.onCommand.addListener(command => {
+    chrome.storage.local.get(['shortcutsEnabled'], settings => {
+        if (settings.shortcutsEnabled === false) return;
+        if (command === 'cycle-speed') {
+            cyclePlaybackSpeed();
+            return;
+        }
+        const commandMap = {
+            'next-lesson': 'COMMAND_NEXT',
+            'play-pause': 'COMMAND_PLAY_PAUSE'
+        };
+        const type = commandMap[command];
+        if (type) {
+            routeToControlledTab({ type });
+            if (type === 'COMMAND_PLAY_PAUSE') sendToCompanion({ type });
+        }
+    });
+});
+
+chrome.tabs.onRemoved.addListener(tabId => {
+    chrome.storage.session.get(['controlledTabId'], result => {
+        if (result.controlledTabId === tabId) chrome.storage.session.remove(['controlledTabId', 'latestState']);
+    });
+});
+
+chrome.windows.onRemoved.addListener(windowId => {
+    chrome.storage.session.get(['companionWindowId'], result => {
+        if (result.companionWindowId === windowId) chrome.storage.session.remove('companionWindowId');
+    });
+});
+
+chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local') return;
+    if (changes.autoMinimizeEnabled?.newValue === false) {
+        getCompanionWindow(win => { if (win?.state === 'minimized') chrome.windows.update(win.id, { state: 'normal' }); });
     }
 });
 
-// 6. INSTALLATION / UPDATE
-// 6. INSTALLATION / UPDATE
-chrome.runtime.onInstalled.addListener((details) => {
-    if (details.reason === 'install') {
-        // Only set defaults if not present (preserve settings on reload/update)
-        chrome.storage.local.get(['playbackSpeed', 'autoAdvanceEnabled', 'shortcutsEnabled', 'autoReadEnabled', 'autoMinimizeEnabled'], (current) => {
-            const defaults = {
-                playbackSpeed: 1.0,
-                autoAdvanceEnabled: true,
-                shortcutsEnabled: true,
-                autoReadEnabled: true,
-                autoMinimizeEnabled: true
-            };
-
-            const toSet = {};
-            for (const key in defaults) {
-                if (current[key] === undefined) {
-                    toSet[key] = defaults[key];
-                }
-            }
-
-            if (Object.keys(toSet).length > 0) {
-                chrome.storage.local.set(toSet);
-                console.log("Alura Flow: Default settings applied (missing keys only).");
-            }
+chrome.runtime.onInstalled.addListener(() => {
+    const defaults = {
+        autoPlayEnabled: true,
+        playbackSpeed: 1,
+        autoAdvanceEnabled: true,
+        autoAdvanceDelay: 5,
+        shortcutsEnabled: true,
+        autoReadEnabled: true,
+        autoMinimizeEnabled: true,
+        ttsRate: 1.15,
+        ttsVoiceURI: '',
+        perCourseSettings: true,
+        progressHistory: []
+    };
+    chrome.storage.local.get(Object.keys(defaults), current => {
+        const missing = {};
+        Object.entries(defaults).forEach(([key, value]) => {
+            if (current[key] === undefined) missing[key] = value;
         });
-    }
+        if (Object.keys(missing).length) chrome.storage.local.set(missing);
+    });
+    ensureCycleSpeedShortcut(false);
 });
+
+ensureCycleSpeedShortcut(false);

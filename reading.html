@@ -1,8 +1,10 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-BR">
 
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Alura Flow Companion</title>
     <style>
         :root {
             --bg-color: #fcfcfc;
@@ -470,28 +472,68 @@
         div#textContainer {
             margin-top: 10px;
         }
+
+        button:focus-visible, a:focus-visible, summary:focus-visible {
+            outline: 3px solid color-mix(in srgb, var(--accent-color) 45%, transparent);
+            outline-offset: 3px;
+        }
+
+        .advance-banner {
+            position: sticky;
+            top: 61px;
+            z-index: 90;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 10px 14px;
+            background: var(--selected-bg);
+            border-bottom: 1px solid var(--selected-border);
+        }
+
+        .advance-banner button { white-space: nowrap; }
+
+        .history-panel {
+            margin-top: 24px;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--subtext-color);
+        }
+
+        .history-panel ol { padding-left: 22px; }
+        .history-panel li { margin: 6px 0; }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+        }
     </style>
 </head>
 
 <body>
     <header class="global-header">
         <div class="header-left">
-            <div id="connectionLed" class="led-active" title="Conectado à Alura"></div>
+            <div id="connectionLed" class="led-active" title="Conectado à Alura" role="status" aria-label="Conectado à Alura"></div>
             <h1 id="mainTitle">Carregando...</h1>
         </div>
         <!-- Right side tools (optional) -->
     </header>
 
+    <div id="advanceBanner" class="advance-banner hidden" role="status" aria-live="assertive">
+        <span id="advanceMessage">Avançando em breve…</span>
+        <button id="advanceAction" class="action-btn">Cancelar</button>
+    </div>
+
     <!-- PLAYER MODE -->
     <section id="view-player" class="mode-view hidden">
         <div class="video-placeholder">
             <span class="icon">🎬</span>
-            <span id="videoStatusText">Reproduzindo vídeo...</span>
+            <span id="videoStatusText" role="status" aria-live="polite">Reproduzindo vídeo...</span>
         </div>
         <div class="controls-wrapper">
-            <button id="remotePrev" class="ctrl-btn" title="Anterior">⏮️</button>
-            <button id="remotePlay" class="ctrl-btn" title="Play/Pause">⏯️</button>
-            <button id="remoteNext" class="ctrl-btn" title="Próxima">⏭️</button>
+            <button id="remotePrev" class="ctrl-btn" title="Anterior" aria-label="Aula anterior">⏮️</button>
+            <button id="remotePlay" class="ctrl-btn" title="Play/Pause" aria-label="Reproduzir ou pausar">⏯️</button>
+            <button id="remoteNext" class="ctrl-btn" title="Próxima" aria-label="Próxima aula">⏭️</button>
         </div>
         <div class="speed-controls">
             <button class="speed-btn" data-speed="1.0">1x</button>
@@ -509,7 +551,7 @@
         <div id="textContainer">
             <div class="reading-actions-top">
                 <button id="ttsBtnTop" class="action-btn">🔊 Ouvir</button>
-                <button id="finishBtnTop" class="action-btn primary">Lido & Próxima</button>
+                <button id="finishBtnTop" class="action-btn primary">Concluir e avançar</button>
             </div>
             <div id="dynamicContent" class="content-container"></div>
             <div id="opinionSection" class="hidden">
@@ -527,12 +569,18 @@
 
         <div class="reading-actions">
             <button id="ttsBtn" class="action-btn">🔊 Ouvir</button>
-            <button id="finishBtn" class="action-btn primary">Lido & Próxima</button>
+            <button id="finishBtn" class="action-btn primary">Concluir e avançar</button>
         </div>
+
+        <details id="historyPanel" class="history-panel">
+            <summary>Progresso recente neste dispositivo</summary>
+            <ol id="historyList"></ol>
+        </details>
     </section>
 
-    <button id="ttsFab" class="fab-control">⏯️</button>
+    <button id="ttsFab" class="fab-control" aria-label="Pausar ou retomar leitura">⏯️</button>
 
+    <script src="core.js"></script>
     <script src="reading.js"></script>
 </body>
 
