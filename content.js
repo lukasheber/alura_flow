@@ -6,6 +6,8 @@ const settings = {
     autoAdvanceEnabled: true,
     autoAdvanceDelay: 5,
     playbackSpeed: 1,
+    autoReadEnabled: true,
+    rsvpAfterVideoEnabled: false,
     perCourseSettings: true,
     courseProfiles: {}
 };
@@ -16,6 +18,9 @@ let diagnosticSentFor = '';
 let transitionTimer = null;
 let countdownTimer = null;
 let observerDebounce = null;
+let activeVideoTranscriptLessonId = null;
+let transcriptLoadingPending = false;
+let transcriptLoadingLessonId = null;
 
 function getNextButton() {
     const continueButton = document.querySelector('.autoplay-continue-button');
@@ -97,6 +102,161 @@ function getVideoRoot(video) {
     return video?.closest('video-js, .video-js') || document.querySelector('video-js, .video-js');
 }
 
+function wait(milliseconds) {
+    return new Promise(resolve => setTimeout(resolve, milliseconds));
+}
+
+function findTranscriptionTab() {
+    return Array.from(document.querySelectorAll('aside button')).find(button =>
+        /transcri[cç][aã]o/i.test(button.getAttribute('title') || button.textContent || '')
+    ) || null;
+}
+
+function transcriptionPanelForTab(tab) {
+    const tabList = tab?.parentElement;
+    const panelHost = tabList?.nextElementSibling;
+    if (!tabList || !panelHost) return null;
+    const tabs = Array.from(tabList.children).filter(element => element.tagName === 'BUTTON');
+    const panels = Array.from(panelHost.children).filter(element => element.nodeType === Node.ELEMENT_NODE);
+    const index = tabs.indexOf(tab);
+    return index >= 0 ? panels[index] || null : null;
+}
+
+async function loadVideoTranscription(timeout = 15000) {
+    const openSidebar = Array.from(document.querySelectorAll('button[aria-label]')).find(button =>
+        /abrir.*menu lateral/i.test(button.getAttribute('aria-label') || '')
+    );
+    if (openSidebar) {
+        openSidebar.click();
+        await wait(250);
+    }
+
+    const tabDeadline = Date.now() + Math.min(2500, timeout);
+    let tab = findTranscriptionTab();
+    while (!tab && Date.now() < tabDeadline) {
+        await wait(100);
+        tab = findTranscriptionTab();
+    }
+    if (!tab) return { available: false };
+
+    tab.click();
+    const startedLoadingAt = Date.now();
+    const deadline = Date.now() + timeout;
+    const minimumWords = 20;
+    let stableFingerprint = '';
+    let stableSince = 0;
+    let bestWordCount = 0;
+    while (Date.now() < deadline) {
+        const panel = transcriptionPanelForTab(tab);
+        if (panel) {
+            const cleanContent = sanitizeClone(panel);
+            const blockCount = cleanContent.querySelectorAll('p, h1, h2, h3, li, blockquote, pre').length;
+            const text = cleanContent.textContent.replace(/\s+/g, ' ').trim();
+            const wordCount = AluraFlowCore.parseRsvpText(text).length;
+            bestWordCount = Math.max(bestWordCount, wordCount);
+            if (AluraFlowCore.isReadableTextCandidate(text, blockCount) && wordCount >= minimumWords && !/^(carregando|loading)\b/i.test(text)) {
+                const fingerprint = `${AluraFlowCore.textFingerprint(text)}:${blockCount}`;
+                if (fingerprint !== stableFingerprint) {
+                    stableFingerprint = fingerprint;
+                    stableSince = Date.now();
+                } else if (Date.now() - stableSince >= 2500 && Date.now() - startedLoadingAt >= 4000) {
+                    return { available: true, text, html: cleanContent.innerHTML, blockCount, wordCount };
+                }
+            } else {
+                stableFingerprint = '';
+                stableSince = 0;
+            }
+        }
+        await wait(150);
+    }
+    return { available: true, loadingFailed: true, wordCount: bestWordCount, minimumWords };
+}
+
+function cancelNativeVideoAdvance(video, timeout = 5000) {
+    const root = getVideoRoot(video);
+    const startedAt = Date.now();
+    let clickedHiddenFallback = false;
+    const attempt = () => {
+        const buttons = Array.from((root || document).querySelectorAll('.autoplay-cancel-button'));
+        const visible = buttons.find(button => !button.closest('.vjs-hidden') && button.getAttribute('aria-disabled') !== 'true');
+        if (visible) {
+            visible.click();
+            return;
+        }
+        if (!clickedHiddenFallback && buttons.length) {
+            clickedHiddenFallback = true;
+            buttons.forEach(button => button.click());
+        }
+        if (Date.now() - startedAt < timeout && (transcriptLoadingPending || activeVideoTranscriptLessonId)) {
+            setTimeout(attempt, 100);
+        }
+    };
+    attempt();
+}
+
+function blockNativeContinueDuringTranscript(event) {
+    if (!transcriptLoadingPending && !activeVideoTranscriptLessonId) return;
+    const continueButton = event.target?.closest?.('.autoplay-continue-button');
+    if (!continueButton) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    cancelNativeVideoAdvance(getVideoElement());
+}
+
+async function handleVideoEnded(video, context) {
+    if (transcriptLoadingPending) return;
+    transcriptLoadingPending = true;
+    transcriptLoadingLessonId = context.lessonId;
+    if (settings.rsvpAfterVideoEnabled) {
+        cancelNativeVideoAdvance(video);
+        currentMode = 'CONTENT';
+        currentViewKey = `VIDEO_TRANSCRIPT:${context.lessonId}:loading`;
+        sendState('CONTENT', {
+            ...context,
+            displayTitle: `Preparando leitura rápida · ${context.title}`,
+            status: 'loading',
+            isLoading: true,
+            loadingReason: 'video-transcription'
+        });
+    }
+    chrome.runtime.sendMessage({ type: 'PREPARE_READING_MODE' });
+    cancelAutoAdvance(false);
+    try {
+        if (settings.rsvpAfterVideoEnabled) {
+            const transcript = await loadVideoTranscription();
+            const currentContext = lessonContext();
+            if (currentContext.lessonId !== context.lessonId) return;
+            if (transcript.text) {
+                activeVideoTranscriptLessonId = context.lessonId;
+                currentMode = 'CONTENT';
+                currentViewKey = `VIDEO_TRANSCRIPT:${context.lessonId}:${AluraFlowCore.textFingerprint(transcript.text)}`;
+                sendState('CONTENT', {
+                    ...context,
+                    displayTitle: `Transcrição · ${context.title}`,
+                    isQuiz: false,
+                    isVideoTranscript: true,
+                    preferredReadingMode: 'rsvp',
+                    autoStartReading: settings.autoReadEnabled !== false,
+                    completionReason: 'video',
+                    transcriptText: transcript.text,
+                    transcriptWordCount: transcript.wordCount,
+                    transcriptBlockCount: transcript.blockCount,
+                    html: transcript.html
+                });
+                return;
+            }
+            if (transcript.loadingFailed) {
+                chrome.runtime.sendMessage({ type: 'VIDEO_TRANSCRIPTION_FAILED' });
+                return;
+            }
+        }
+        if (settings.autoAdvanceEnabled) scheduleAutoAdvance('video');
+    } finally {
+        transcriptLoadingPending = false;
+        transcriptLoadingLessonId = null;
+    }
+}
+
 function visibleVideoControl(root, selector) {
     return Array.from((root || document).querySelectorAll(selector)).find(button =>
         !button.disabled && button.getAttribute('aria-disabled') !== 'true' && !button.closest('.vjs-hidden')
@@ -168,11 +328,22 @@ function pauseVideo(video) {
 function isVideoLesson(video) {
     return Boolean(
         document.querySelector('.task-body-header-title-svg use[href*="#VIDEO"]') ||
-        document.querySelector('video-js, .video-js, .video-container, #video-player, [data-vjs-player="true"]') || video ||
-        Array.from(document.querySelectorAll('ul li.group a[href*="/task/"]'))
-            .find(link => link.matches('.bg-surface-default, .border-l-brand-default, [aria-current="page"]'))
-            ?.querySelector('span.font-jetbrains-mono')
+        document.querySelector('video-js, .video-js, .video-container, #video-player, [data-vjs-player="true"]') || video
     );
+}
+
+function getTextLessonContent() {
+    const candidates = document.querySelectorAll([
+        '.hqExplanation .formattedText',
+        '#task-content .formattedText',
+        'section[aria-label="Conteúdo da aula"]',
+        'section.select-text'
+    ].join(', '));
+    return Array.from(candidates).find(candidate => {
+        if (candidate.closest('.video-transcription, #transcription')) return false;
+        const blocks = candidate.querySelectorAll('p, h1, h2, h3, li, blockquote, pre').length;
+        return AluraFlowCore.isReadableTextCandidate(candidate.textContent, blocks);
+    }) || null;
 }
 
 function attachVideoListeners(video, context) {
@@ -193,10 +364,7 @@ function attachVideoListeners(video, context) {
     video.addEventListener('ratechange', () => {
         if (video.readyState > 0) chrome.runtime.sendMessage({ type: 'SPEED_UPDATED', speed: video.playbackRate, courseId: context.courseId });
     });
-    video.addEventListener('ended', () => {
-        chrome.runtime.sendMessage({ type: 'PREPARE_READING_MODE' });
-        if (settings.autoAdvanceEnabled) scheduleAutoAdvance('video');
-    });
+    video.addEventListener('ended', () => handleVideoEnded(video, lessonContext()), true);
 
     const tryAutoplay = () => {
         if (settings.autoPlayEnabled !== false && video.dataset.afAutoplayStarted !== 'true' && video.paused) {
@@ -229,9 +397,12 @@ function quizExplicitlySuccessful() {
     const quiz = getNewStructureQuizElements();
     if (!quiz) return false;
     const options = Array.from(quiz.options);
-    const hasError = options.some(button => button.querySelector('[aria-label="Resposta incorreta"]') || button.classList.contains('feedback-error') || button.classList.contains('incorrect'));
-    const hasSuccess = options.some(button => button.querySelector('[aria-label="Resposta correta"]') || button.classList.contains('feedback-success'));
-    return hasSuccess && !hasError;
+    const states = options.map(optionFeedback);
+    if (states.some(state => state.incorrect)) return false;
+    const correctCount = states.filter(state => state.correct).length;
+    const rules = AluraFlowCore.quizSelectionRules(quiz.instructionP?.textContent || '');
+    if (rules.requiredChoices > 0) return correctCount >= rules.requiredChoices;
+    return !rules.isMultiple && correctCount >= 1;
 }
 
 function optionFeedback(button) {
@@ -257,6 +428,7 @@ function extractQuizData() {
             current = current.previousElementSibling;
         }
         const instructionHTML = newQuiz.instructionP ? sanitizeClone(newQuiz.instructionP).innerHTML : '';
+        const rules = AluraFlowCore.quizSelectionRules(newQuiz.instructionP?.textContent || instructionHTML);
         const rawOptions = Array.from(newQuiz.options).map((button, index) => {
             const feedback = optionFeedback(button);
             const selected = button.getAttribute('aria-selected') === 'true' || button.classList.contains('border-interactive-primary') || button.classList.contains('bg-surface-secondary') || feedback.incorrect || feedback.correct;
@@ -270,15 +442,13 @@ function extractQuizData() {
                 isNewStructure: true
             };
         });
-        const isMultiple = /alternativas/i.test(instructionHTML);
-        const requiredChoices = Number(instructionHTML.match(/selecione\s+(\d+)/i)?.[1] || 0);
         return {
             questionHTML: questionParts.join('') || 'Questão',
             instructionHTML,
-            options: rawOptions.map(option => ({ ...option, isCorrect: explicitlySuccessful && option.isCorrect })),
-            isSolved: AluraFlowCore.isQuizSolved(rawOptions, isMultiple, requiredChoices, explicitlySuccessful),
-            isMultiple,
-            requiredChoices
+            options: rawOptions,
+            isSolved: AluraFlowCore.isQuizSolved(rawOptions, rules.isMultiple, rules.requiredChoices, explicitlySuccessful),
+            isMultiple: rules.isMultiple,
+            requiredChoices: rules.requiredChoices
         };
     }
 
@@ -299,15 +469,15 @@ function extractQuizData() {
             isSelected: item.classList.contains('alternativeList-item--checked') || Boolean(item.querySelector('input:checked'))
         };
     });
-    const isMultiple = items.some(item => item.querySelector('input[type="checkbox"]'));
-    const requiredChoices = Number(instructionHTML.match(/selecione\s+(\d+)/i)?.[1] || 0);
+    const rules = AluraFlowCore.quizSelectionRules(instruction?.textContent || instructionHTML);
+    const isMultiple = rules.isMultiple || items.some(item => item.querySelector('input[type="checkbox"]'));
     return {
         questionHTML: question ? sanitizeClone(question).innerHTML : 'Questão',
         instructionHTML,
-        options: rawOptions.map(option => ({ ...option, isCorrect: explicitlySuccessful && option.isCorrect })),
-        isSolved: AluraFlowCore.isQuizSolved(rawOptions, isMultiple, requiredChoices, explicitlySuccessful),
+        options: rawOptions,
+        isSolved: AluraFlowCore.isQuizSolved(rawOptions, isMultiple, rules.requiredChoices, explicitlySuccessful),
         isMultiple,
-        requiredChoices
+        requiredChoices: rules.requiredChoices
     };
 }
 
@@ -315,7 +485,17 @@ function reportState(force = false, forceBind = false) {
     const context = lessonContext();
     const video = getVideoElement();
 
+    if (activeVideoTranscriptLessonId && activeVideoTranscriptLessonId !== context.lessonId) {
+        activeVideoTranscriptLessonId = null;
+    }
+
+    // Opening the transcription sidebar can temporarily remove the player from
+    // the lesson DOM. Keep the explicit loading state instead of diagnosing the
+    // same lesson as an unknown type while its transcript is still stabilizing.
+    if (transcriptLoadingPending && transcriptLoadingLessonId === context.lessonId) return;
+
     if (isVideoLesson(video)) {
+        if (activeVideoTranscriptLessonId === context.lessonId) return;
         if (!video) {
             const key = `PLAYER:${context.lessonId}:loading`;
             if (force || currentMode !== 'PLAYER' || currentViewKey !== key) {
@@ -350,14 +530,13 @@ function reportState(force = false, forceBind = false) {
         return;
     }
 
-    const candidates = document.querySelectorAll('.hqExplanation .formattedText, #task-content .formattedText, section[aria-label="Conteúdo da aula"]');
-    const textContent = Array.from(candidates).find(candidate => !candidate.closest('.video-transcription, #transcription'));
+    const textContent = getTextLessonContent();
     if (textContent) {
         const cleanContent = sanitizeClone(textContent);
         const opinionElement = document.querySelector('#task-feedback .formattedText');
         const opinionHtml = opinionElement ? sanitizeClone(opinionElement).innerHTML : null;
         const html = cleanContent.innerHTML;
-        const key = `TEXT:${context.lessonId}:${html.length}:${html.slice(0, 120)}`;
+        const key = `TEXT:${context.lessonId}:${AluraFlowCore.textFingerprint(cleanContent.textContent)}`;
         if (force || currentMode !== 'CONTENT' || currentViewKey !== key) {
             currentMode = 'CONTENT';
             currentViewKey = key;
@@ -367,7 +546,7 @@ function reportState(force = false, forceBind = false) {
         return;
     }
 
-    if (/\/task\//.test(location.pathname) && Date.now() - lastSuccessfulReport > 10000 && diagnosticSentFor !== context.lessonId) {
+    if (!transcriptLoadingPending && /\/task\//.test(location.pathname) && Date.now() - lastSuccessfulReport > 10000 && diagnosticSentFor !== context.lessonId) {
         diagnosticSentFor = context.lessonId;
         chrome.runtime.sendMessage({ type: 'SELECTOR_DIAGNOSTIC', data: { ...context, message: 'A estrutura desta aula não foi reconhecida.' } });
     }
@@ -414,6 +593,7 @@ function scheduleAutoAdvance(reason) {
         cancelAutoAdvance(false);
         const nextButton = getNextButton();
         if (!nextButton) return;
+        activeVideoTranscriptLessonId = null;
         handleTransition();
         chrome.runtime.sendMessage({ type: 'AUTO_ADVANCE_EXECUTED', reason });
         nextButton.click();
@@ -427,7 +607,9 @@ function watchQuizFeedback() {
         const oldFeedback = document.querySelector('.choiceable-aria-feedback')?.textContent.toLocaleLowerCase('pt-BR') || '';
         const newOptions = quiz ? Array.from(quiz.options) : [];
         const optionStates = newOptions.map(optionFeedback);
-        const feedback = AluraFlowCore.quizFeedbackFingerprint(optionStates, oldFeedback);
+        const rules = AluraFlowCore.quizSelectionRules(quiz?.instructionP?.textContent || '');
+        const requiredForFeedback = rules.requiredChoices || (rules.isMultiple ? Number.POSITIVE_INFINITY : 1);
+        const feedback = AluraFlowCore.quizFeedbackFingerprint(optionStates, oldFeedback, requiredForFeedback);
         const { success, error, wrongIds } = feedback;
         const state = feedback.fingerprint;
         if (!state || state === lastFeedback) return;
@@ -438,7 +620,7 @@ function watchQuizFeedback() {
         if (success) {
             chrome.runtime.sendMessage({ type: 'QUIZ_FEEDBACK_SUCCESS', correctIds });
             if (settings.autoAdvanceEnabled) scheduleAutoAdvance('quiz');
-        } else {
+        } else if (error) {
             cancelAutoAdvance(false);
             chrome.runtime.sendMessage({ type: 'QUIZ_FEEDBACK_ERROR', correctIds, wrongIds });
             if (correctIds.length) chrome.runtime.sendMessage({ type: 'QUIZ_REVEAL_CORRECT', correctIds });
@@ -470,7 +652,9 @@ function setupObservers() {
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     const video = getVideoElement();
-    if (message.type === 'COMMAND_PLAY_PAUSE' && video) {
+    if (message.type === 'COMMAND_PLAY_PAUSE' && activeVideoTranscriptLessonId) {
+        // The companion owns play/pause while it is presenting the post-video RSVP review.
+    } else if (message.type === 'COMMAND_PLAY_PAUSE' && video) {
         if (video.paused || getVideoRoot(video)?.classList.contains('vjs-paused')) playVideo(video, 'companion');
         else pauseVideo(video);
     } else if (message.type === 'COMMAND_PLAY_PAUSE') {
@@ -478,12 +662,20 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         reportState(true);
     } else if (message.type === 'COMMAND_NEXT' || message.type === 'FINISH_READING') {
         cancelAutoAdvance(false);
+        activeVideoTranscriptLessonId = null;
         const button = getNextButton();
         if (button) { handleTransition(); button.click(); }
+        else {
+            sendResponse?.({ ok: false, error: 'Botão de próxima lição não encontrado.' });
+            return false;
+        }
     } else if (message.type === 'AUTO_FINISH_READING') {
-        if (settings.autoAdvanceEnabled) scheduleAutoAdvance('reading');
+        if (settings.autoAdvanceEnabled) scheduleAutoAdvance(message.reason === 'video' ? 'video' : 'reading');
+    } else if (message.type === 'RETRY_VIDEO_TRANSCRIPTION' && video) {
+        handleVideoEnded(video, lessonContext());
     } else if (message.type === 'COMMAND_PREV') {
         cancelAutoAdvance(false);
+        activeVideoTranscriptLessonId = null;
         const button = getPrevButton();
         if (button) button.click();
     } else if (message.type === 'COMMAND_CYCLE_SPEED' && video) {
@@ -506,6 +698,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     } else if (message.type === 'UPDATE_AUTO_ADVANCE') {
         settings.autoAdvanceEnabled = Boolean(message.enabled);
         if (!settings.autoAdvanceEnabled) cancelAutoAdvance(true);
+        else {
+            const hasQuiz = document.querySelector('.alternativeList') || getNewStructureQuizElements();
+            if (hasQuiz && extractQuizData().isSolved && !transitionTimer) scheduleAutoAdvance('quiz');
+        }
     } else if (message.type === 'COMPANION_READY') {
         reportState(true, Boolean(message.forceBind));
     }
@@ -519,6 +715,10 @@ chrome.storage.onChanged.addListener((changes, area) => {
         if (changes[key]) settings[key] = changes[key].newValue;
     });
     if (changes.autoAdvanceEnabled?.newValue === false) cancelAutoAdvance(true);
+    if (changes.rsvpAfterVideoEnabled?.newValue === false && activeVideoTranscriptLessonId) {
+        activeVideoTranscriptLessonId = null;
+        reportState(true);
+    }
     if (changes.playbackSpeed || changes.courseProfiles || changes.perCourseSettings) {
         const video = getVideoElement();
         if (video) video.playbackRate = effectivePlaybackSpeed(lessonContext().courseId);
@@ -528,6 +728,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
 function init() {
     chrome.storage.local.get(Object.keys(settings), stored => {
         Object.assign(settings, stored);
+        document.addEventListener('click', blockNativeContinueDuringTranscript, true);
         setupObservers();
         setTimeout(() => reportState(true), 300);
     });

@@ -5,33 +5,61 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Alura Flow</title>
   <style>
-    :root { color-scheme: light dark; --bg:#f7f8fb; --card:#fff; --text:#202124; --muted:#5f6368; --accent:#1769d2; --border:#dfe3ea; --danger:#b3261e; }
-    @media (prefers-color-scheme:dark) { :root { --bg:#17181b; --card:#23252a; --text:#f1f3f4; --muted:#bdc1c6; --accent:#7bb1ff; --border:#3c4048; --danger:#ffb4ab; } }
+    :root { color-scheme:light dark; --bg:#f7f8fb; --card:#fff; --text:#202124; --muted:#5f6368; --accent:#1769d2; --accent-soft:#e8f1fd; --border:#dfe3ea; --danger:#b3261e; --danger-soft:#fce8e6; }
+    @media (prefers-color-scheme:dark) { :root { --bg:#17181b; --card:#23252a; --text:#f1f3f4; --muted:#bdc1c6; --accent:#7bb1ff; --accent-soft:#263a55; --border:#3c4048; --danger:#ffb4ab; --danger-soft:#4f2926; } }
     * { box-sizing:border-box; }
-    body { width:330px; margin:0; padding:14px; font:13px/1.4 system-ui,sans-serif; background:var(--bg); color:var(--text); }
-    h1 { margin:0 0 12px; color:var(--accent); font-size:19px; }
-    h2 { margin:0 0 8px; font-size:13px; }
-    .card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:11px; margin-bottom:10px; }
-    .row { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:8px 0; }
-    .stack { display:grid; gap:6px; }
-    label { font-weight:600; }
+    [hidden] { display:none!important; }
+    body { width:360px; max-height:600px; overflow-y:auto; margin:0; padding:14px; font:13px/1.42 system-ui,sans-serif; background:var(--bg); color:var(--text); }
+    .app-header { display:flex; align-items:center; justify-content:space-between; min-height:30px; margin-bottom:10px; }
+    h1 { margin:0; color:var(--accent); font-size:19px; }
+    h2 { margin:0 0 9px; font-size:14px; }
+    h3 { margin:12px 0 5px; font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+    p { margin:6px 0; }
+    .card { background:var(--card); border:1px solid var(--border); border-radius:11px; padding:12px; margin-bottom:10px; }
+    .row { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:9px 0; }
+    .stack { display:grid; gap:7px; }
+    .divider { height:1px; margin:12px 0 8px; background:var(--border); }
+    label, legend { font-weight:600; }
     label.inline { font-weight:400; flex:1; }
     select, input[type=range] { width:100%; }
     select, button { border:1px solid var(--border); border-radius:7px; background:var(--card); color:var(--text); padding:7px; }
     button { cursor:pointer; font-weight:600; }
-    button.primary { background:var(--accent); color:white; border-color:var(--accent); }
-    button:focus-visible, select:focus-visible, input:focus-visible { outline:3px solid color-mix(in srgb, var(--accent) 45%, transparent); outline-offset:2px; }
-    output { min-width:42px; text-align:right; color:var(--accent); font-weight:700; }
-    .muted { color:var(--muted); font-size:12px; }
+    button:disabled, select:disabled, input:disabled { cursor:not-allowed; opacity:.55; }
+    button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+    button.danger { color:var(--danger); border-color:color-mix(in srgb,var(--danger) 45%,var(--border)); }
+    button.danger-confirm { background:var(--danger); border-color:var(--danger); color:#fff; }
+    button:focus-visible, select:focus-visible, input:focus-visible, .mode-choice:has(input:focus-visible) { outline:3px solid color-mix(in srgb,var(--accent) 45%,transparent); outline-offset:2px; }
+    output { min-width:52px; text-align:right; color:var(--accent); font-weight:700; }
+    .muted, .help { color:var(--muted); font-size:12px; }
+    .help { margin:4px 0 8px; }
+    .save-status { color:var(--accent); font-size:12px; min-width:45px; text-align:right; }
     #sessionStatus[data-state="error"] { color:var(--danger); }
     .actions { display:flex; gap:7px; }
     .actions button { flex:1; }
+    .toggle-row { display:flex; align-items:flex-start; gap:9px; margin:10px 0; cursor:pointer; }
+    .toggle-row input { margin-top:2px; flex:0 0 auto; }
+    .toggle-copy { display:grid; gap:1px; font-weight:400; }
+    .toggle-copy strong { font-weight:600; }
+    .dependent { margin:6px 0 11px 23px; padding:4px 0 2px 10px; border-left:2px solid var(--border); }
+    .field { display:grid; gap:5px; margin:9px 0; }
+    .range-scale { display:flex; justify-content:space-between; color:var(--muted); font-size:11px; margin-top:-3px; }
+    .mode-fieldset { border:0; padding:0; margin:8px 0 11px; min-width:0; }
+    .mode-fieldset legend { margin-bottom:6px; }
+    .segmented { display:grid; grid-template-columns:1fr 1fr; gap:5px; padding:3px; border:1px solid var(--border); border-radius:9px; background:var(--bg); }
+    .mode-choice { position:relative; cursor:pointer; border-radius:6px; text-align:center; padding:7px 6px; font-weight:600; color:var(--muted); }
+    .mode-choice input { position:absolute; opacity:0; pointer-events:none; }
+    .mode-choice:has(input:checked) { color:var(--accent); background:var(--card); box-shadow:0 1px 3px color-mix(in srgb,var(--text) 15%,transparent); }
     .shortcut { font-family:ui-monospace,monospace; }
+    .shortcut-list { display:grid; grid-template-columns:auto 1fr; gap:4px 9px; margin:8px 0; }
+    .full-width { width:100%; }
     @media (prefers-reduced-motion:reduce) { * { scroll-behavior:auto!important; transition:none!important; } }
   </style>
 </head>
 <body>
-  <h1>Alura Flow</h1>
+  <header class="app-header">
+    <h1>Alura Flow</h1>
+    <span id="saveStatus" class="save-status" role="status" aria-live="polite"></span>
+  </header>
 
   <section class="card" aria-labelledby="sessionHeading">
     <h2 id="sessionHeading">Curso controlado</h2>
@@ -47,33 +75,70 @@
   </section>
 
   <section class="card" aria-labelledby="playbackHeading">
-    <h2 id="playbackHeading">Reprodução</h2>
-    <div class="row"><label for="speedSlider">Velocidade</label><output id="speedValue">1x</output></div>
+    <h2 id="playbackHeading">Vídeos</h2>
+    <div class="row"><label id="speedLabel" for="speedSlider">Velocidade padrão</label><output id="speedValue">1x</output></div>
     <input type="range" id="speedSlider" min="0.5" max="4" step="0.25" value="1">
-    <div class="row"><input type="checkbox" id="perCourseToggle"><label class="inline" for="perCourseToggle">Lembrar velocidade por curso</label></div>
-    <div class="row"><input type="checkbox" id="autoPlayToggle"><label class="inline" for="autoPlayToggle">Iniciar vídeos automaticamente</label></div>
-    <div class="row"><input type="checkbox" id="autoAdvanceToggle"><label class="inline" for="autoAdvanceToggle">Avançar automaticamente</label></div>
-    <div class="row"><label for="advanceDelay">Contagem regressiva</label><select id="advanceDelay" style="width:auto"><option value="0">Imediato</option><option value="3">3 s</option><option value="5">5 s</option><option value="10">10 s</option><option value="15">15 s</option></select></div>
-    <div class="row"><input type="checkbox" id="minimizeToggle"><label class="inline" for="minimizeToggle">Minimizar durante vídeos</label></div>
+    <div class="range-scale" aria-hidden="true"><span>0,5x</span><span>4x</span></div>
+    <p id="speedScopeHint" class="help">Aplicada a todos os cursos.</p>
+    <label class="toggle-row"><input type="checkbox" id="perCourseToggle"><span class="toggle-copy"><strong>Lembrar velocidade por curso</strong><span class="muted">Mantém uma velocidade diferente para cada curso.</span></span></label>
+    <label class="toggle-row"><input type="checkbox" id="autoPlayToggle"><span class="toggle-copy"><strong>Iniciar vídeos automaticamente</strong></span></label>
+    <label class="toggle-row"><input type="checkbox" id="autoAdvanceToggle" aria-controls="autoAdvanceOptions"><span class="toggle-copy"><strong>Avançar automaticamente</strong></span></label>
+    <div id="autoAdvanceOptions" class="dependent">
+      <div class="row"><label for="advanceDelay">Aguardar antes de avançar</label><select id="advanceDelay" style="width:auto"><option value="0">Imediato</option><option value="3">3 s</option><option value="5">5 s</option><option value="10">10 s</option><option value="15">15 s</option></select></div>
+    </div>
+    <label class="toggle-row"><input type="checkbox" id="minimizeToggle"><span class="toggle-copy"><strong>Minimizar companion durante o vídeo</strong></span></label>
+
+    <div class="divider"></div>
+    <h3>Após o vídeo</h3>
+    <label class="toggle-row"><input type="checkbox" id="transcriptAfterVideoToggle" aria-controls="transcriptOptions"><span class="toggle-copy"><strong>Ler a transcrição</strong><span class="muted">Abre a transcrição na barra lateral antes de avançar.</span></span></label>
+    <div id="transcriptOptions" class="dependent">
+      <p class="help">Usa Leitura rápida e respeita “Iniciar automaticamente” na seção Leitura.</p>
+      <div class="row"><label for="transcriptRsvpWpm">Velocidade de leitura</label><output id="transcriptRsvpWpmValue">300 ppm</output></div>
+      <input type="range" id="transcriptRsvpWpm" min="100" max="800" step="25" value="300">
+      <div class="range-scale" aria-hidden="true"><span>100 ppm</span><span>800 ppm</span></div>
+    </div>
   </section>
 
-  <section class="card" aria-labelledby="voiceHeading">
-    <h2 id="voiceHeading">Leitura em voz alta</h2>
-    <div class="row"><input type="checkbox" id="autoReadToggle"><label class="inline" for="autoReadToggle">Ler textos automaticamente</label></div>
-    <label class="muted" for="voiceSelect">Voz</label>
-    <select id="voiceSelect"><option value="">Voz automática do idioma</option></select>
-    <div class="row"><label for="ttsRate">Ritmo da voz</label><output id="ttsRateValue">1.15x</output></div>
-    <input type="range" id="ttsRate" min="0.5" max="2" step="0.05" value="1.15">
+  <section class="card" aria-labelledby="readingHeading">
+    <h2 id="readingHeading">Leitura</h2>
+    <fieldset class="mode-fieldset">
+      <legend>Modo padrão</legend>
+      <div class="segmented" role="radiogroup" aria-label="Modo padrão de leitura">
+        <label class="mode-choice"><input type="radio" name="readingMode" id="readingModeTts" value="tts"><span>Ouvir com voz</span></label>
+        <label class="mode-choice"><input type="radio" name="readingMode" id="readingModeRsvp" value="rsvp"><span>Leitura rápida</span></label>
+      </div>
+    </fieldset>
+    <label class="toggle-row"><input type="checkbox" id="autoReadToggle"><span class="toggle-copy"><strong>Iniciar automaticamente</strong><span class="muted">Aplica-se às aulas de texto e às transcrições abertas após vídeos.</span></span></label>
+
+    <div id="ttsOptions" class="dependent" aria-labelledby="readingModeTts">
+      <div class="field"><label for="voiceSelect">Voz</label><select id="voiceSelect"><option value="">Voz automática do idioma</option></select></div>
+      <div class="row"><label for="ttsRate">Ritmo da voz</label><output id="ttsRateValue">1.15x</output></div>
+      <input type="range" id="ttsRate" min="0.5" max="2" step="0.05" value="1.15">
+      <div class="range-scale" aria-hidden="true"><span>0,5x</span><span>2x</span></div>
+    </div>
+
+    <div id="rsvpOptions" class="dependent" aria-labelledby="readingModeRsvp">
+      <div class="row"><label for="rsvpWpm">Palavras por minuto</label><output id="rsvpWpmValue">300 ppm</output></div>
+      <input type="range" id="rsvpWpm" min="100" max="800" step="25" value="300">
+      <div class="range-scale" aria-hidden="true"><span>100 ppm</span><span>800 ppm</span></div>
+    </div>
   </section>
 
-  <section class="card" aria-labelledby="accessHeading">
-    <h2 id="accessHeading">Atalhos e progresso</h2>
-    <div class="row"><input type="checkbox" id="shortcutsToggle"><label class="inline" for="shortcutsToggle">Habilitar atalhos globais</label></div>
-    <div class="muted"><span class="shortcut">Ctrl+Alt+P</span> reproduzir · <span class="shortcut">Ctrl+Alt+N</span> próxima · <span class="shortcut">Ctrl+Alt+S</span> velocidade</div>
-    <p id="shortcutStatus" class="muted" role="status" aria-live="polite">Verificando o atalho de velocidade…</p>
-    <button id="repairSpeedShortcut">Restaurar Ctrl+Alt+S</button>
+  <section class="card" aria-labelledby="shortcutsHeading">
+    <h2 id="shortcutsHeading">Atalhos globais</h2>
+    <label class="toggle-row"><input type="checkbox" id="shortcutsToggle" aria-controls="shortcutDetails"><span class="toggle-copy"><strong>Habilitar atalhos</strong><span class="muted">Funcionam enquanto o Firefox estiver aberto.</span></span></label>
+    <div id="shortcutDetails" class="dependent">
+      <div class="shortcut-list muted"><span class="shortcut">Ctrl+Alt+P</span><span>Reproduzir ou pausar</span><span class="shortcut">Ctrl+Alt+N</span><span>Próxima lição</span><span class="shortcut">Ctrl+Alt+S</span><span>Alterar velocidade</span></div>
+      <p id="shortcutStatus" class="muted" role="status" aria-live="polite">Verificando os atalhos…</p>
+      <button id="repairSpeedShortcut" class="full-width" hidden>Restaurar Ctrl+Alt+S</button>
+    </div>
+  </section>
+
+  <section class="card" aria-labelledby="historyHeading">
+    <h2 id="historyHeading">Histórico e dados</h2>
     <p id="progressSummary" class="muted" aria-live="polite">Nenhum progresso local.</p>
-    <button id="clearHistory">Limpar histórico local</button>
+    <button id="clearHistory" class="danger full-width" disabled>Limpar histórico…</button>
+    <p id="clearHistoryHint" class="muted" role="status" aria-live="polite"></p>
   </section>
   <script src="popup.js"></script>
 </body>

@@ -11,12 +11,19 @@ A **Alura Flow** resolve isso trazendo o curso até você, e não o contrário. 
 
 ## Funcionalidades Principais
 
-### Novidades da versão 2.1
+### Novidades da versão 2.5.5
 
 * **Sessão segura por aba:** escolha exatamente qual curso o companion deve controlar.
 * **Avanço com contagem regressiva:** cancele antes de avançar ou desfaça por oito segundos.
 * **Perfis por curso:** a velocidade pode ser lembrada separadamente para cada curso.
 * **Leitura configurável:** escolha a voz e ajuste o ritmo da narração sem alterar a velocidade dos vídeos.
+* **Leitura rápida RSVP:** exiba uma palavra por vez com ponto focal destacado, velocidade ajustável e pausas inteligentes em pontuação.
+* **Leitura da transcrição:** opcionalmente, ao terminar um vídeo, cancele o avanço nativo do player, aguarde a transcrição completa estabilizar e leia seu conteúdo em RSVP antes de avançar.
+* **Configurações contextuais:** o popup mostra somente os ajustes relacionados ao modo escolhido e separa vídeos, leitura, atalhos e dados.
+* **Início automático unificado:** a mesma opção controla aulas de texto e transcrições abertas depois de vídeos.
+* **Transições protegidas:** telas de carregamento usam uma visualização neutra e nunca são enviadas ao TTS ou à leitura rápida.
+* **Transcrição sem falso alerta:** enquanto o RSVP do vídeo está sendo preparado, a aula permanece em estado de espera e não aparece como tipo desconhecido.
+* **RSVP clicável:** clique no próprio quadro de leitura rápida — ou use Enter/Espaço — para iniciar, pausar e retomar.
 * **Progresso local:** as últimas aulas abertas e concluídas ficam registradas somente no navegador.
 * **Diagnóstico de seletores:** quando a Alura muda a estrutura de uma aula, a extensão mostra um aviso em vez de falhar silenciosamente.
 
@@ -80,8 +87,10 @@ Ao clicar no ícone da extensão na barra de ferramentas, você pode:
 * Ativar/Desativar o avanço automático.
 * Habilitar/Desabilitar os atalhos globais.
 * Escolher a aba/curso controlado.
-* Definir o atraso do avanço automático, a voz e o ritmo da leitura.
-* Limpar o histórico de progresso local.
+* Definir o atraso do avanço automático somente quando esse comportamento estiver ativo.
+* Configurar separadamente voz, leitura rápida e velocidade RSVP das transcrições.
+* Ativar a leitura RSVP da transcrição depois de vídeos que ofereçam esse conteúdo na barra lateral.
+* Consultar e limpar, com confirmação, o histórico de progresso local.
 
 ## Validação para desenvolvimento
 

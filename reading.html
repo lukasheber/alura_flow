@@ -127,6 +127,33 @@
             opacity: 0;
         }
 
+        /* --- LOADING VIEW --- */
+        #view-loading {
+            min-height: 360px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            color: var(--subtext-color);
+            text-align: center;
+        }
+
+        #view-loading.hidden { display: none; }
+
+        .loading-spinner {
+            width: 34px;
+            height: 34px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--accent-color);
+            border-radius: 50%;
+            animation: loading-spin 0.8s linear infinite;
+        }
+
+        #loadingMessage { margin: 0; }
+
+        @keyframes loading-spin { to { transform: rotate(360deg); } }
+
         /* --- PLAYER VIEW --- */
         #view-player {
             display: flex;
@@ -250,6 +277,13 @@
             color: var(--subtext-color);
             margin-bottom: 20px;
             font-style: italic;
+        }
+
+        #quizProgress {
+            color: var(--accent-color);
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin: -10px 0 14px;
         }
 
         .options-list {
@@ -450,6 +484,8 @@
         .reading-actions-top {
             display: flex;
             justify-content: flex-end;
+            align-items: center;
+            flex-wrap: wrap;
             gap: 10px;
             margin-bottom: 20px;
             padding-bottom: 10px;
@@ -471,6 +507,144 @@
 
         div#textContainer {
             margin-top: 10px;
+        }
+
+        .reading-mode-switch {
+            display: inline-flex;
+            margin-right: auto;
+            padding: 2px;
+            border: 1px solid var(--border-color);
+            border-radius: 999px;
+            background: var(--hint-bg);
+        }
+
+        .reading-mode-switch button {
+            border: 0;
+            border-radius: 999px;
+            padding: 5px 9px;
+            background: transparent;
+            color: var(--subtext-color);
+            cursor: pointer;
+            font: inherit;
+            font-size: 0.78rem;
+            font-weight: 600;
+        }
+
+        .reading-mode-switch button.active {
+            background: var(--accent-color);
+            color: var(--btn-text);
+        }
+
+        #textContainer.rsvp-mode #dynamicContent,
+        #textContainer.rsvp-mode #opinionSection {
+            display: none;
+        }
+
+        #rsvpPanel {
+            padding: 16px;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            background: var(--hint-bg);
+        }
+
+        .rsvp-stage {
+            position: relative;
+            min-height: 210px;
+            overflow: hidden;
+            border-radius: 10px;
+            background: #111318;
+            color: #f7f7f7;
+            cursor: pointer;
+            transition: box-shadow 0.2s ease, transform 0.2s ease;
+        }
+
+        .rsvp-stage:hover {
+            box-shadow: 0 0 0 2px var(--accent-color), 0 8px 24px rgba(0, 0, 0, 0.22);
+        }
+
+        .rsvp-stage:active { transform: scale(0.995); }
+
+        .rsvp-stage:focus-visible {
+            outline: 3px solid var(--accent-color);
+            outline-offset: 3px;
+        }
+
+        .rsvp-marker {
+            position: absolute;
+            left: 50%;
+            width: 2px;
+            height: 32px;
+            transform: translateX(-50%);
+            background: var(--wrong-border);
+        }
+
+        .rsvp-marker.top { top: 0; }
+        .rsvp-marker.bottom { bottom: 0; }
+
+        .rsvp-word {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font: 600 clamp(2rem, 9vw, 4rem)/1 ui-monospace, SFMono-Regular, Consolas, monospace;
+            white-space: nowrap;
+        }
+
+        #rsvpBefore {
+            position: absolute;
+            right: calc(50% + 0.5ch);
+            text-align: right;
+        }
+
+        #rsvpFocus {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #ff5f5f;
+            text-shadow: 0 0 18px rgba(255, 95, 95, 0.55);
+        }
+
+        #rsvpAfter {
+            position: absolute;
+            left: calc(50% + 0.5ch);
+            text-align: left;
+        }
+
+        .rsvp-progress {
+            width: 100%;
+            margin: 16px 0 8px;
+        }
+
+        .rsvp-meta {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            color: var(--subtext-color);
+            font-size: 0.82rem;
+        }
+
+        .rsvp-speed-control {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            white-space: nowrap;
+        }
+
+        #rsvpWpmInline { width: 115px; }
+
+        @media (max-width: 430px) {
+            .reading-mode-switch { width: 100%; margin-right: 0; }
+            .reading-mode-switch button { flex: 1; }
+            .rsvp-meta { align-items: stretch; flex-direction: column; }
+            .rsvp-speed-control { justify-content: space-between; }
+            #rsvpWpmInline { flex: 1; }
+        }
+
+        #quizNextBtn {
+            width: 100%;
+            margin-top: 16px;
         }
 
         button:focus-visible, a:focus-visible, summary:focus-visible {
@@ -524,6 +698,12 @@
         <button id="advanceAction" class="action-btn">Cancelar</button>
     </div>
 
+    <!-- TRANSITION MODE: never treated as lesson content by TTS or RSVP -->
+    <section id="view-loading" class="mode-view hidden" aria-live="polite" aria-busy="true">
+        <div class="loading-spinner" aria-hidden="true"></div>
+        <p id="loadingMessage">Preparando a próxima aula…</p>
+    </section>
+
     <!-- PLAYER MODE -->
     <section id="view-player" class="mode-view hidden">
         <div class="video-placeholder">
@@ -550,8 +730,26 @@
         <!-- Text Content Area -->
         <div id="textContainer">
             <div class="reading-actions-top">
+                <div class="reading-mode-switch" role="group" aria-label="Modo de leitura">
+                    <button type="button" data-reading-mode="tts" class="active" aria-pressed="true">🔊 TTS</button>
+                    <button type="button" data-reading-mode="rsvp" aria-pressed="false">⚡ Leitura rápida</button>
+                </div>
                 <button id="ttsBtnTop" class="action-btn">🔊 Ouvir</button>
                 <button id="finishBtnTop" class="action-btn primary">Concluir e avançar</button>
+            </div>
+            <div id="rsvpPanel" class="hidden">
+                <div id="rsvpStage" class="rsvp-stage" role="button" tabindex="0" aria-pressed="false"
+                    aria-label="Iniciar leitura rápida" title="Clique para iniciar a leitura rápida"
+                    aria-live="polite" aria-atomic="true">
+                    <span class="rsvp-marker top" aria-hidden="true"></span>
+                    <div class="rsvp-word"><span id="rsvpBefore"></span><span id="rsvpFocus">•</span><span id="rsvpAfter"></span></div>
+                    <span class="rsvp-marker bottom" aria-hidden="true"></span>
+                </div>
+                <input id="rsvpProgress" class="rsvp-progress" type="range" min="0" max="100" step="0.1" value="0" aria-label="Posição da leitura rápida">
+                <div class="rsvp-meta">
+                    <span id="rsvpStatus" role="status">Pronto para iniciar</span>
+                    <label class="rsvp-speed-control" for="rsvpWpmInline"><span id="rsvpWpmInlineValue">300 ppm</span><input id="rsvpWpmInline" type="range" min="100" max="800" step="25" value="300"></label>
+                </div>
             </div>
             <div id="dynamicContent" class="content-container"></div>
             <div id="opinionSection" class="hidden">
@@ -564,7 +762,9 @@
         <div id="quizContainer" class="hidden">
             <h2 id="quizQuestion">Loading...</h2>
             <p id="quizInstruction" class="hidden"></p>
+            <p id="quizProgress" class="hidden" role="status" aria-live="polite"></p>
             <div id="quizOptions" class="options-list"></div>
+            <button id="quizNextBtn" class="action-btn primary hidden">Avançar para a próxima lição</button>
         </div>
 
         <div class="reading-actions">

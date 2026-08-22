@@ -37,22 +37,35 @@
         return required > 0 && selected.length === required && selected.every(option => option.isCorrect === true);
     }
 
-    function quizFeedbackFingerprint(optionStates, feedbackText = '') {
+    function quizSelectionRules(instruction) {
+        const text = String(instruction || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+        const requiredChoices = Number(text.match(/selecione\s+(\d+)/i)?.[1] || 0);
+        const isMultiple = requiredChoices > 1 || /\balternativas\b/i.test(text);
+        return { isMultiple, requiredChoices };
+    }
+
+    function quizFeedbackFingerprint(optionStates, feedbackText = '', requiredChoices = 1) {
         const states = Array.isArray(optionStates) ? optionStates : [];
         const wrongIds = states.flatMap((state, index) => state?.incorrect ? [String(index)] : []);
         const correctIds = states.flatMap((state, index) => state?.correct ? [String(index)] : []);
         const text = String(feedbackText).toLocaleLowerCase('pt-BR');
-        const success = /acertou|parabéns/.test(text) || (correctIds.length > 0 && wrongIds.length === 0);
+        const required = Math.max(1, Number(requiredChoices) || 1);
+        const success = /acertou|parabéns/.test(text) || (correctIds.length >= required && wrongIds.length === 0);
         const error = /errou|tente novamente/.test(text) || wrongIds.length > 0;
-        const fingerprint = success ? `success:${correctIds.join(',')}` : error ? `error:${wrongIds.join(',')}:${text}` : '';
-        return { success, error, wrongIds, correctIds, fingerprint };
+        const partial = !success && !error && correctIds.length > 0;
+        const fingerprint = success ? `success:${correctIds.join(',')}` : error ? `error:${wrongIds.join(',')}:${text}` : partial ? `partial:${correctIds.join(',')}:${required}` : '';
+        return { success, error, partial, wrongIds, correctIds, fingerprint };
     }
 
     function isLoadingState(data) {
         if (!data) return false;
         if (data.isLoading === true || data.status === 'loading') return true;
-        const title = String(data.title || '').toLocaleLowerCase('pt-BR');
+        const title = String(data.displayTitle || data.title || '').toLocaleLowerCase('pt-BR');
         return /\b(carregando|preparando)\b/.test(title);
+    }
+
+    function canReadLesson(data) {
+        return Boolean(data) && data.isQuiz !== true && !isLoadingState(data);
     }
 
     function nextPlaybackSpeed(currentSpeed, steps = [1, 1.25, 1.5, 2]) {
@@ -61,6 +74,75 @@
         const current = Number(currentSpeed);
         if (!Number.isFinite(current)) return speeds[0];
         return speeds.find(speed => speed > current + 0.01) || speeds[0];
+    }
+
+    function shouldOfferUndo(autoAdvanceReason) {
+        return autoAdvanceReason !== 'quiz';
+    }
+
+    function isReadableTextCandidate(text, blockCount) {
+        const normalized = String(text || '').replace(/\s+/g, ' ').trim();
+        return Number(blockCount) > 0 && normalized.length >= 20;
+    }
+
+    function textFingerprint(value) {
+        const normalized = String(value || '').replace(/\s+/g, ' ').trim();
+        let hash = 2166136261;
+        for (let index = 0; index < normalized.length; index += 1) {
+            hash ^= normalized.charCodeAt(index);
+            hash = Math.imul(hash, 16777619);
+        }
+        return `${normalized.length}:${(hash >>> 0).toString(36)}`;
+    }
+
+    function parseRsvpText(value) {
+        return String(value || '').trim().split(/\s+/).filter(Boolean);
+    }
+
+    function shouldAutoStartReading(autoStartOverride, globalSetting) {
+        return autoStartOverride === undefined ? globalSetting !== false : autoStartOverride === true;
+    }
+
+    function rsvpOrpIndex(word) {
+        const value = String(word || '');
+        if (!value) return 0;
+        const letterCount = (value.match(/\p{L}/gu) || []).length;
+        let target = 0;
+        if (letterCount <= 3) target = 0;
+        else if (letterCount <= 5) target = 1;
+        else if (letterCount <= 9) target = 2;
+        else if (letterCount <= 12) target = 3;
+        else target = Math.floor(Math.log2(letterCount - 1)) + 1;
+
+        let seen = 0;
+        for (let index = 0; index < value.length; index += 1) {
+            if (!/\p{L}/u.test(value[index])) continue;
+            if (seen === target) return index;
+            seen += 1;
+        }
+        return Math.min(target, Math.max(0, value.length - 1));
+    }
+
+    function splitRsvpWord(word) {
+        const value = String(word || '');
+        if (!value) return { before: '', focus: '', after: '' };
+        const index = rsvpOrpIndex(value);
+        return { before: value.slice(0, index), focus: value[index] || '', after: value.slice(index + 1) };
+    }
+
+    function rsvpWordDelay(word, wordsPerMinute, options = {}) {
+        const wpm = Math.min(1200, Math.max(50, Number(wordsPerMinute) || 300));
+        let delay = 60000 / wpm;
+        const value = String(word || '');
+        const longWordPercent = Math.max(0, Number(options.longWordPercent ?? 5));
+        if (value.length >= 12 && longWordPercent > 0) {
+            delay *= 1 + (longWordPercent / 100) * (value.length - 12);
+        }
+        if (options.pauseOnPunctuation !== false) {
+            if (/[.!?;:][”’"'»)\]]?$/.test(value)) delay *= Math.max(1, Number(options.punctuationMultiplier) || 2);
+            else if (/,[”’"'»)\]]?$/.test(value)) delay *= 1.5;
+        }
+        return Math.round(delay);
     }
 
     function chooseControlledTab(tabs, boundTabId) {
@@ -104,9 +186,19 @@
         classIndicatesIncorrect,
         opinionIndicatesCorrect,
         isQuizSolved,
+        quizSelectionRules,
         quizFeedbackFingerprint,
         isLoadingState,
+        canReadLesson,
         nextPlaybackSpeed,
+        shouldOfferUndo,
+        isReadableTextCandidate,
+        textFingerprint,
+        parseRsvpText,
+        shouldAutoStartReading,
+        rsvpOrpIndex,
+        splitRsvpWord,
+        rsvpWordDelay,
         chooseControlledTab,
         courseIdFromUrl,
         lessonIdFromUrl

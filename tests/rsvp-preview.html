@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <title>RSVP preview</title>
+  <style>html,body{margin:0;background:#888}iframe{display:block;width:520px;height:680px;margin:20px auto;border:0;box-shadow:0 8px 30px #0005}</style>
+</head>
+<body>
+  <iframe id="preview" title="RSVP companion preview"></iframe>
+  <script>
+    (async () => {
+      const frame = document.getElementById('preview');
+      const source = await fetch('../reading.html').then(response => response.text());
+      const state = {
+        mode: 'CONTENT',
+        data: {
+          lessonId: 'preview', courseId: 'preview', title: 'Demonstração RSVP', language: 'pt-BR',
+          html: '<h2>Leitura rápida</h2><p>Este é um texto de demonstração para verificar o foco visual e os controles RSVP funcionando corretamente.</p>',
+          isQuiz: false
+        }
+      };
+      const stub = `<script>
+        window.chrome = {
+          runtime: {
+            onMessage: { addListener() {} },
+            sendMessage(message, callback) { callback?.(message.type === 'COMPANION_READY' ? ${JSON.stringify(state)} : { ok: true }); }
+          },
+          storage: {
+            local: {
+              get(keys, callback) { callback({ autoReadEnabled: false, readingMode: 'rsvp', rsvpWpm: 300, transcriptRsvpWpm: 350, autoAdvanceEnabled: false, progressHistory: [], playbackSpeed: 1 }); },
+              set(value, callback) { callback?.(); }
+            },
+            onChanged: { addListener() {} }
+          }
+        };
+      <\/script>`;
+      frame.srcdoc = source.replace('<head>', '<head><base href="../">').replace('<script src="core.js"><\/script>', `${stub}<script src="core.js"><\/script>`);
+    })();
+  </script>
+</body>
+</html>

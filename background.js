@@ -126,7 +126,9 @@ function routeToControlledTab(payload, callback = () => {}) {
         }
         chrome.tabs.sendMessage(tab.id, payload, response => {
             const error = chrome.runtime.lastError;
-            callback(error ? { ok: false, error: error.message } : { ok: true, tabId: tab.id, response });
+            if (error) callback({ ok: false, error: error.message });
+            else if (response?.ok === false) callback({ ...response, tabId: tab.id });
+            else callback({ ok: true, tabId: tab.id, response });
         });
     });
 }
@@ -332,7 +334,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     const routedCommands = new Set([
         'COMMAND_PLAY_PAUSE', 'COMMAND_NEXT', 'COMMAND_PREV', 'COMMAND_CYCLE_SPEED',
-        'UPDATE_AUTO_ADVANCE', 'SELECT_OPTION', 'FINISH_READING', 'AUTO_FINISH_READING', 'CANCEL_AUTO_ADVANCE'
+        'UPDATE_AUTO_ADVANCE', 'SELECT_OPTION', 'FINISH_READING', 'AUTO_FINISH_READING', 'CANCEL_AUTO_ADVANCE',
+        'RETRY_VIDEO_TRANSCRIPTION'
     ]);
     if (routedCommands.has(message.type)) {
         routeToControlledTab(message, sendResponse);
@@ -360,6 +363,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         getCompanionWindow(win => {
             if (win) chrome.windows.update(win.id, { state: 'normal', focused: true });
         });
+        return false;
+    }
+
+    if (message.type === 'VIDEO_TRANSCRIPTION_FAILED') {
+        sendToCompanion(message);
         return false;
     }
 
@@ -423,6 +431,10 @@ chrome.runtime.onInstalled.addListener(() => {
         autoAdvanceDelay: 5,
         shortcutsEnabled: true,
         autoReadEnabled: true,
+        readingMode: 'tts',
+        rsvpWpm: 300,
+        transcriptRsvpWpm: 300,
+        rsvpAfterVideoEnabled: false,
         autoMinimizeEnabled: true,
         ttsRate: 1.15,
         ttsVoiceURI: '',
@@ -434,6 +446,7 @@ chrome.runtime.onInstalled.addListener(() => {
         Object.entries(defaults).forEach(([key, value]) => {
             if (current[key] === undefined) missing[key] = value;
         });
+        if (current.transcriptRsvpWpm === undefined) missing.transcriptRsvpWpm = Number(current.rsvpWpm) || 300;
         if (Object.keys(missing).length) chrome.storage.local.set(missing);
     });
     ensureCycleSpeedShortcut(false);

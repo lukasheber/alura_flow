@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <title>Popup preview</title>
+  <style>html,body{margin:0;background:#7d838c}iframe{display:block;width:390px;height:700px;margin:20px auto;border:0;box-shadow:0 10px 32px #0006}</style>
+</head>
+<body>
+  <iframe id="preview" title="Prévia das configurações"></iframe>
+  <script>
+    (async () => {
+      const frame = document.getElementById('preview');
+      const source = await fetch('../popup.html').then(response => response.text());
+      const stored = {
+        playbackSpeed: 1.25, autoPlayEnabled: true, autoAdvanceEnabled: true, autoAdvanceDelay: 5,
+        shortcutsEnabled: true, autoReadEnabled: true, autoMinimizeEnabled: true, ttsRate: 1.15,
+        ttsVoiceURI: '', readingMode: 'tts', rsvpWpm: 325, transcriptRsvpWpm: 400,
+        rsvpAfterVideoEnabled: true, perCourseSettings: true,
+        courseProfiles: { 'ux-design': { playbackSpeed: 1.5 } },
+        progressHistory: [{ lessonId: '1', completedAt: Date.now() }, { lessonId: '2' }]
+      };
+      const session = {
+        tabs: [{ id: 7, title: 'Alura — Fundamentos de UX', url: 'https://cursos.alura.com.br/course/ux-design/task/1', active: true }],
+        controlledTabId: 7,
+        latestState: { data: { title: 'Fundamentos de UX', courseId: 'ux-design' } }
+      };
+      const stub = `<script>
+        window.chrome = {
+          runtime: { sendMessage(message, callback) { callback?.(message.type === 'GET_SESSION_STATUS' ? ${JSON.stringify(session)} : { ok: true, shortcut: 'Ctrl+Alt+S' }); } },
+          storage: { local: { get(keys, callback) { callback(${JSON.stringify(stored)}); }, set(value, callback) { Object.assign(${JSON.stringify(stored)}, value); callback?.(); } } },
+          commands: { getAll(callback) { callback([{ name: 'cycle-speed', shortcut: 'Ctrl+Alt+S' }]); } }
+        };
+      <\/script>`;
+      frame.srcdoc = source
+        .replace('<head>', '<head><base href="../">')
+        .replace('<script src="popup.js"><\/script>', `${stub}<script src="popup.js"><\/script>`);
+    })();
+  </script>
+</body>
+</html>
