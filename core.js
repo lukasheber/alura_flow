@@ -103,6 +103,12 @@
         return autoStartOverride === undefined ? globalSetting !== false : autoStartOverride === true;
     }
 
+    function canAutoStartRsvp(attention = {}) {
+        return attention.documentVisible === true &&
+            attention.documentFocused === true &&
+            attention.windowFocused === true;
+    }
+
     function rsvpOrpIndex(word) {
         const value = String(word || '');
         if (!value) return 0;
@@ -196,6 +202,7 @@
         textFingerprint,
         parseRsvpText,
         shouldAutoStartReading,
+        canAutoStartRsvp,
         rsvpOrpIndex,
         splitRsvpWord,
         rsvpWordDelay,

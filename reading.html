@@ -482,11 +482,13 @@
 
         /* --- New Top Controls --- */
         .reading-actions-top {
+            position: relative;
             display: flex;
             justify-content: flex-end;
             align-items: center;
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
             gap: 10px;
+            min-height: 34px;
             margin-bottom: 20px;
             padding-bottom: 10px;
             border-bottom: 1px dashed var(--border-color);
@@ -496,6 +498,18 @@
             font-size: 0.9em;
             padding: 6px 12px;
         }
+
+        #ttsBtnTop {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            max-width: 120px;
+            padding-inline: 9px;
+            font-size: 0.82rem;
+            white-space: nowrap;
+        }
+
+        #finishBtnTop { white-space: nowrap; }
 
         /* --- Fix Overlap & Spacing --- */
         #view-content {
@@ -634,7 +648,23 @@
 
         #rsvpWpmInline { width: 115px; }
 
-        @media (max-width: 430px) {
+        @media (max-width: 560px) {
+            .reading-mode-switch button {
+                padding-inline: 7px;
+                font-size: 0.72rem;
+            }
+        }
+
+        @media (max-width: 460px) {
+            .reading-actions-top {
+                flex-direction: column;
+                align-items: center;
+            }
+            #ttsBtnTop {
+                position: static;
+                transform: none;
+            }
+            #finishBtnTop { margin-inline: auto; }
             .reading-mode-switch { width: 100%; margin-right: 0; }
             .reading-mode-switch button { flex: 1; }
             .rsvp-meta { align-items: stretch; flex-direction: column; }

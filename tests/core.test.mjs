@@ -168,11 +168,19 @@ test('automatic reading override applies equally to text lessons and video trans
     assert.equal(core.shouldAutoStartReading(false, true), false);
 });
 
+test('automatic RSVP requires visible and focused companion attention', () => {
+    assert.equal(core.canAutoStartRsvp({ documentVisible: true, documentFocused: true, windowFocused: true }), true);
+    assert.equal(core.canAutoStartRsvp({ documentVisible: false, documentFocused: true, windowFocused: true }), false);
+    assert.equal(core.canAutoStartRsvp({ documentVisible: true, documentFocused: false, windowFocused: true }), false);
+    assert.equal(core.canAutoStartRsvp({ documentVisible: true, documentFocused: true, windowFocused: false }), false);
+});
+
 test('current video sidebar exposes a stable transcription source for RSVP', async () => {
-    const [fixture, contentScript, companionScript] = await Promise.all([
+    const [fixture, contentScript, companionScript, background] = await Promise.all([
         readFile(new URL('./fixtures/video-transcription-sidebar.html', import.meta.url), 'utf8'),
         readFile(new URL('../content.js', import.meta.url), 'utf8'),
-        readFile(new URL('../reading.js', import.meta.url), 'utf8')
+        readFile(new URL('../reading.js', import.meta.url), 'utf8'),
+        readFile(new URL('../background.js', import.meta.url), 'utf8')
     ]);
     assert.match(fixture, /title="Transcrição">Transcrição/);
     assert.match(fixture, /Esta é a transcrição completa/);
@@ -188,6 +196,12 @@ test('current video sidebar exposes a stable transcription source for RSVP', asy
     assert.doesNotMatch(contentScript, /loadVideoTranscription\(video\?\.duration\)/);
     assert.match(companionScript, /currentData\?\.transcriptText/);
     assert.match(companionScript, /shouldAutoStartReading\(data\.autoStartReading, settings\.autoReadEnabled\)/);
+    assert.match(companionScript, /checkCompanionAttention\(hasAttention/);
+    assert.match(companionScript, /Leitura pronta · clique no quadro para iniciar/);
+    assert.match(background, /isTranscriptReading/);
+    assert.match(background, /function firefoxHasFocusedWindow/);
+    assert.match(background, /ensureCompanionWindow\(message, firefoxIsActive\)/);
+    assert.doesNotMatch(background, /PREPARE_READING_MODE'[\s\S]{0,180}focused:\s*true/);
     assert.doesNotMatch(contentScript, /textTracks|vjs-subtitles|vjs-captions/);
 });
 
@@ -218,6 +232,7 @@ test('popup and companion expose RSVP settings and mode controls', async () => {
     assert.match(companion, /id="rsvpStage"[^>]*role="button"[^>]*tabindex="0"/);
     assert.match(companionScript, /ui\.rsvpStage\.addEventListener\('click', toggleRsvp\)/);
     assert.match(companionScript, /event\.key !== 'Enter' && event\.key !== ' '/);
+    assert.match(companion, /#ttsBtnTop\s*\{[^}]*position:\s*absolute;[^}]*left:\s*50%;[^}]*translateX\(-50%\)/s);
     assert.match(companionScript, /transcriptRsvpWpm/);
     assert.match(background, /transcriptRsvpWpm: 300/);
     assert.match(notices, /MIT License/);

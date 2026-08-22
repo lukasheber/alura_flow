@@ -58,7 +58,7 @@ function sendToCompanion(message) {
     chrome.runtime.sendMessage({ ...message, target: 'COMPANION' }, () => void chrome.runtime.lastError);
 }
 
-function createCompanionWindow(initialState, callback = () => {}) {
+function createCompanionWindow(initialState, focus = true, callback = () => {}) {
     if (isCreatingWindow) {
         creationQueue.push(callback);
         return;
@@ -70,7 +70,7 @@ function createCompanionWindow(initialState, callback = () => {}) {
         type: 'popup',
         width: 520,
         height: 680,
-        focused: true
+        focused: focus
     }, win => {
         const error = chrome.runtime.lastError;
         isCreatingWindow = false;
@@ -91,11 +91,21 @@ function createCompanionWindow(initialState, callback = () => {}) {
 function ensureCompanionWindow(message, focus = false) {
     getCompanionWindow(win => {
         if (!win) {
-            createCompanionWindow(message);
+            createCompanionWindow(message, focus);
             return;
         }
         sendToCompanion(message);
         if (focus) chrome.windows.update(win.id, { state: 'normal', focused: true });
+    });
+}
+
+function firefoxHasFocusedWindow(callback) {
+    chrome.windows.getAll({}, windows => {
+        if (chrome.runtime.lastError) {
+            callback(false);
+            return;
+        }
+        callback((windows || []).some(win => win.focused === true));
     });
 }
 
@@ -258,7 +268,18 @@ function handleStateUpdate(message, sender) {
             return;
         }
 
-        if (message.mode === 'CONTENT') ensureCompanionWindow(message, true);
+        if (message.mode === 'CONTENT') {
+            const isTranscriptReading = message.data?.isVideoTranscript === true || message.data?.loadingReason === 'video-transcription';
+            if (!isTranscriptReading) {
+                ensureCompanionWindow(message, true);
+                return;
+            }
+            firefoxHasFocusedWindow(firefoxIsActive => {
+                // Bring RSVP forward while the user is browsing Firefox, but
+                // preserve the foreground application when Firefox is inactive.
+                ensureCompanionWindow(message, firefoxIsActive);
+            });
+        }
     });
 }
 
@@ -360,9 +381,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     if (message.type === 'PREPARE_READING_MODE') {
-        getCompanionWindow(win => {
-            if (win) chrome.windows.update(win.id, { state: 'normal', focused: true });
-        });
+        // The loading state is already routed to the companion. Do not steal
+        // focus from another application merely because a transcript is ready.
         return false;
     }
 

@@ -11,7 +11,7 @@ A **Alura Flow** resolve isso trazendo o curso até você, e não o contrário. 
 
 ## Funcionalidades Principais
 
-### Novidades da versão 2.5.5
+### Novidades da versão 2.5.8
 
 * **Sessão segura por aba:** escolha exatamente qual curso o companion deve controlar.
 * **Avanço com contagem regressiva:** cancele antes de avançar ou desfaça por oito segundos.
@@ -24,6 +24,9 @@ A **Alura Flow** resolve isso trazendo o curso até você, e não o contrário. 
 * **Transições protegidas:** telas de carregamento usam uma visualização neutra e nunca são enviadas ao TTS ou à leitura rápida.
 * **Transcrição sem falso alerta:** enquanto o RSVP do vídeo está sendo preparado, a aula permanece em estado de espera e não aparece como tipo desconhecido.
 * **RSVP clicável:** clique no próprio quadro de leitura rápida — ou use Enter/Espaço — para iniciar, pausar e retomar.
+* **Controles estáveis:** o botão de iniciar, pausar ou retomar permanece centralizado mesmo quando seu texto muda.
+* **Início RSVP consciente:** a leitura automática só começa com a companion visível e focada; fora do Firefox ela aguarda um clique e não rouba o foco.
+* **Foco contextual:** a companion volta ao primeiro plano durante a navegação no Firefox, mas não interrompe o usuário quando outro programa está ativo.
 * **Progresso local:** as últimas aulas abertas e concluídas ficam registradas somente no navegador.
 * **Diagnóstico de seletores:** quando a Alura muda a estrutura de uma aula, a extensão mostra um aviso em vez de falhar silenciosamente.
 

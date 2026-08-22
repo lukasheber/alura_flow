@@ -33,6 +33,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let rsvpFinished = false;
     let rsvpTimer = null;
     let rsvpLessonKey = '';
+    let rsvpStartedAutomatically = false;
+    let attentionCheckTimer = null;
     let lastClickedOptionId = null;
     let bannerMode = 'cancel';
     let undoTimer = null;
@@ -79,6 +81,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function readingRunKey(mode = readingMode) {
         return `${currentViewKey}:${mode}`;
+    }
+
+    function checkCompanionAttention(callback) {
+        const finish = windowFocused => callback(AluraFlowCore.canAutoStartRsvp({
+            documentVisible: document.visibilityState === 'visible',
+            documentFocused: document.hasFocus(),
+            windowFocused
+        }));
+        if (!chrome.windows?.getCurrent) {
+            finish(document.hasFocus());
+            return;
+        }
+        chrome.windows.getCurrent(win => {
+            const unavailable = Boolean(chrome.runtime.lastError);
+            finish(!unavailable && win?.focused === true && win.state !== 'minimized');
+        });
+    }
+
+    function showRsvpReadyForManualStart() {
+        ui.rsvpStatus.textContent = 'Leitura pronta · clique no quadro para iniciar';
+    }
+
+    function scheduleAutomaticRsvpAttentionCheck() {
+        clearTimeout(attentionCheckTimer);
+        attentionCheckTimer = setTimeout(() => {
+            if (!rsvpPlaying || !rsvpStartedAutomatically) return;
+            checkCompanionAttention(hasAttention => {
+                if (hasAttention || !rsvpPlaying || !rsvpStartedAutomatically) return;
+                pauseRsvp('Leitura pausada · clique para retomar');
+            });
+        }, 350);
     }
 
     function updateReadingControls() {
@@ -164,6 +197,7 @@ document.addEventListener('DOMContentLoaded', () => {
         clearRsvpTimer();
         rsvpPlaying = false;
         rsvpPaused = false;
+        rsvpStartedAutomatically = false;
         if (resetPosition) {
             rsvpIndex = 0;
             rsvpFinished = false;
@@ -194,6 +228,7 @@ document.addEventListener('DOMContentLoaded', () => {
         rsvpPlaying = false;
         rsvpPaused = false;
         rsvpFinished = true;
+        rsvpStartedAutomatically = false;
         ui.rsvpStatus.textContent = `Leitura concluída · ${rsvpWords.length} palavras`;
         updateReadingControls();
         completeTextReading(completedRunKey, false, completedViewKey);
@@ -231,22 +266,26 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         rsvpPlaying = true;
         rsvpPaused = false;
+        rsvpStartedAutomatically = options.automatic === true;
         updateReadingControls();
         scheduleRsvpWord();
     }
 
-    function pauseRsvp() {
+    function pauseRsvp(statusMessage = '') {
         if (!rsvpPlaying) return;
         clearRsvpTimer();
         rsvpPlaying = false;
         rsvpPaused = true;
+        rsvpStartedAutomatically = false;
         updateReadingControls();
+        if (statusMessage) ui.rsvpStatus.textContent = statusMessage;
     }
 
     function resumeRsvp() {
         if (!rsvpPaused || !rsvpWords.length) return;
         rsvpPlaying = true;
         rsvpPaused = false;
+        rsvpStartedAutomatically = false;
         updateReadingControls();
         scheduleRsvpWord();
     }
@@ -463,8 +502,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 autoReadAttemptedKey = scheduledKey;
                 clearTimeout(autoReadTimer);
                 autoReadTimer = setTimeout(() => {
-                    if (readingMode === 'rsvp') startRsvp({ automatic: true, expectedKey: scheduledKey });
-                    else startSpeaking({ automatic: true, expectedKey: scheduledKey });
+                    if (readingMode !== 'rsvp') {
+                        startSpeaking({ automatic: true, expectedKey: scheduledKey });
+                        return;
+                    }
+                    checkCompanionAttention(hasAttention => {
+                        if (scheduledKey !== readingRunKey('rsvp') || currentMode !== 'CONTENT') return;
+                        if (!hasAttention) {
+                            showRsvpReadyForManualStart();
+                            return;
+                        }
+                        startRsvp({ automatic: true, expectedKey: scheduledKey });
+                    });
                 }, 500);
             }
         });
@@ -629,6 +678,10 @@ document.addEventListener('DOMContentLoaded', () => {
         event.preventDefault();
         toggleRsvp();
     });
+    document.addEventListener('visibilitychange', scheduleAutomaticRsvpAttentionCheck);
+    window.addEventListener('blur', scheduleAutomaticRsvpAttentionCheck);
+    window.addEventListener('focus', () => clearTimeout(attentionCheckTimer));
+    chrome.windows?.onFocusChanged?.addListener(scheduleAutomaticRsvpAttentionCheck);
     ui.rsvpProgress.addEventListener('input', () => {
         if (!rsvpWords.length) return;
         rsvpIndex = Math.min(rsvpWords.length - 1, Math.max(0, Math.round((Number(ui.rsvpProgress.value) / 100) * (rsvpWords.length - 1))));
