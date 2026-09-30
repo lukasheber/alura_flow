@@ -112,6 +112,15 @@ function findTranscriptionTab() {
     ) || null;
 }
 
+function findOnPageTranscriptionElement() {
+    return document.querySelector([
+        '#transcription',
+        'section#transcription',
+        'section[aria-label*="transcri" i]',
+        '.video-transcription'
+    ].join(', ')) || null;
+}
+
 function transcriptionPanelForTab(tab) {
     const tabList = tab?.parentElement;
     const panelHost = tabList?.nextElementSibling;
@@ -122,34 +131,64 @@ function transcriptionPanelForTab(tab) {
     return index >= 0 ? panels[index] || null : null;
 }
 
+function sanitizeTranscriptionClone(source) {
+    const cleanContent = sanitizeClone(source);
+    // Remove the standalone section header (e.g. <h3>Transcrição</h3> or <h2>Transcrição da aula</h2>)
+    // so it doesn't get read out as the first words or duplicate the title header.
+    cleanContent.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach(heading => {
+        if (/^\s*transcri[cç][aã]o(\s+da\s+aula)?\s*$/i.test(heading.textContent)) {
+            heading.remove();
+        }
+    });
+    return cleanContent;
+}
+
 async function loadVideoTranscription(timeout = 15000) {
-    const openSidebar = Array.from(document.querySelectorAll('button[aria-label]')).find(button =>
-        /abrir.*menu lateral/i.test(button.getAttribute('aria-label') || '')
-    );
-    if (openSidebar) {
-        openSidebar.click();
-        await wait(250);
-    }
-
-    const tabDeadline = Date.now() + Math.min(2500, timeout);
-    let tab = findTranscriptionTab();
-    while (!tab && Date.now() < tabDeadline) {
-        await wait(100);
-        tab = findTranscriptionTab();
-    }
-    if (!tab) return { available: false };
-
-    tab.click();
     const startedLoadingAt = Date.now();
+    const tabDeadline = Date.now() + Math.min(2500, timeout);
+    let onPageElement = findOnPageTranscriptionElement();
+    let tab = null;
+
+    if (!onPageElement) {
+        const openSidebar = Array.from(document.querySelectorAll('button[aria-label]')).find(button =>
+            /abrir.*menu lateral/i.test(button.getAttribute('aria-label') || '')
+        );
+        if (openSidebar) {
+            openSidebar.click();
+            await wait(250);
+        }
+
+        while (!onPageElement && !tab && Date.now() < tabDeadline) {
+            onPageElement = findOnPageTranscriptionElement();
+            if (onPageElement) break;
+            tab = findTranscriptionTab();
+            if (tab) break;
+            await wait(100);
+        }
+    }
+
+    if (!onPageElement && !tab) return { available: false };
+
+    if (tab && !onPageElement) {
+        tab.click();
+    }
+
     const deadline = Date.now() + timeout;
     const minimumWords = 20;
     let stableFingerprint = '';
     let stableSince = 0;
     let bestWordCount = 0;
+
     while (Date.now() < deadline) {
-        const panel = transcriptionPanelForTab(tab);
+        const currentOnPage = findOnPageTranscriptionElement();
+        if (currentOnPage) onPageElement = currentOnPage;
+
+        const panel = onPageElement || transcriptionPanelForTab(tab);
         if (panel) {
-            const cleanContent = sanitizeClone(panel);
+            const expandButton = panel.querySelector('button[aria-expanded="false"]');
+            if (expandButton) expandButton.click();
+
+            const cleanContent = sanitizeTranscriptionClone(panel);
             const blockCount = cleanContent.querySelectorAll('p, h1, h2, h3, li, blockquote, pre').length;
             const text = cleanContent.textContent.replace(/\s+/g, ' ').trim();
             const wordCount = AluraFlowCore.parseRsvpText(text).length;
@@ -159,6 +198,10 @@ async function loadVideoTranscription(timeout = 15000) {
                 if (fingerprint !== stableFingerprint) {
                     stableFingerprint = fingerprint;
                     stableSince = Date.now();
+                } else if (onPageElement) {
+                    if (Date.now() - stableSince >= 1000) {
+                        return { available: true, text, html: cleanContent.innerHTML, blockCount, wordCount };
+                    }
                 } else if (Date.now() - stableSince >= 2500 && Date.now() - startedLoadingAt >= 4000) {
                     return { available: true, text, html: cleanContent.innerHTML, blockCount, wordCount };
                 }
@@ -340,7 +383,7 @@ function getTextLessonContent() {
         'section.select-text'
     ].join(', '));
     return Array.from(candidates).find(candidate => {
-        if (candidate.closest('.video-transcription, #transcription')) return false;
+        if (candidate.closest('.video-transcription, #transcription, section[aria-label*="transcri" i]')) return false;
         const blocks = candidate.querySelectorAll('p, h1, h2, h3, li, blockquote, pre').length;
         return AluraFlowCore.isReadableTextCandidate(candidate.textContent, blocks);
     }) || null;
@@ -671,8 +714,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         }
     } else if (message.type === 'AUTO_FINISH_READING') {
         if (settings.autoAdvanceEnabled) scheduleAutoAdvance(message.reason === 'video' ? 'video' : 'reading');
-    } else if (message.type === 'RETRY_VIDEO_TRANSCRIPTION' && video) {
-        handleVideoEnded(video, lessonContext());
+    } else if (message.type === 'RETRY_VIDEO_TRANSCRIPTION' && (video || isVideoLesson(video))) {
+        handleVideoEnded(video || getVideoElement(), lessonContext());
     } else if (message.type === 'COMMAND_PREV') {
         cancelAutoAdvance(false);
         activeVideoTranscriptLessonId = null;

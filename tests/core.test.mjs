@@ -205,6 +205,24 @@ test('current video sidebar exposes a stable transcription source for RSVP', asy
     assert.doesNotMatch(contentScript, /textTracks|vjs-subtitles|vjs-captions/);
 });
 
+test('on-page video transcription below player exposes readable content and proper selectors', async () => {
+    const [fixture, contentScript] = await Promise.all([
+        readFile(new URL('./fixtures/video-transcription-onpage.html', import.meta.url), 'utf8'),
+        readFile(new URL('../content.js', import.meta.url), 'utf8')
+    ]);
+    assert.match(fixture, /<section id="transcription"/);
+    assert.match(fixture, /aria-label="Transcrição da aula"/);
+    assert.match(fixture, /Encerrando o assunto sobre a importância da educação financeira/);
+    assert.match(contentScript, /function findOnPageTranscriptionElement/);
+    assert.match(contentScript, /#transcription/);
+    assert.match(contentScript, /section\[aria-label\*="transcri"/);
+    assert.match(contentScript, /function sanitizeTranscriptionClone/);
+    const blockCount = [...fixture.matchAll(/<(?:p|h[1-3]|li|blockquote|pre)\b/g)].length;
+    const text = fixture.replace(/<[^>]+>/g, ' ');
+    assert.equal(core.isReadableTextCandidate(text, blockCount), true);
+    assert.ok(core.parseRsvpText(text).length > 100);
+});
+
 test('popup and companion expose RSVP settings and mode controls', async () => {
     const [popup, popupScript, companion, companionScript, background, notices] = await Promise.all([
         readFile(new URL('../popup.html', import.meta.url), 'utf8'),
