@@ -5,141 +5,238 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Alura Flow</title>
   <style>
-    :root { color-scheme:light dark; --bg:#f7f8fb; --card:#fff; --text:#202124; --muted:#5f6368; --accent:#1769d2; --accent-soft:#e8f1fd; --border:#dfe3ea; --danger:#b3261e; --danger-soft:#fce8e6; }
-    @media (prefers-color-scheme:dark) { :root { --bg:#17181b; --card:#23252a; --text:#f1f3f4; --muted:#bdc1c6; --accent:#7bb1ff; --accent-soft:#263a55; --border:#3c4048; --danger:#ffb4ab; --danger-soft:#4f2926; } }
-    * { box-sizing:border-box; }
-    [hidden] { display:none!important; }
-    body { width:360px; max-height:600px; overflow-y:auto; margin:0; padding:14px; font:13px/1.42 system-ui,sans-serif; background:var(--bg); color:var(--text); }
-    .app-header { display:flex; align-items:center; justify-content:space-between; min-height:30px; margin-bottom:10px; }
-    h1 { margin:0; color:var(--accent); font-size:19px; }
-    h2 { margin:0 0 9px; font-size:14px; }
-    h3 { margin:12px 0 5px; font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
-    p { margin:6px 0; }
-    .card { background:var(--card); border:1px solid var(--border); border-radius:11px; padding:12px; margin-bottom:10px; }
-    .row { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:9px 0; }
-    .stack { display:grid; gap:7px; }
-    .divider { height:1px; margin:12px 0 8px; background:var(--border); }
-    label, legend { font-weight:600; }
-    label.inline { font-weight:400; flex:1; }
-    select, input[type=range] { width:100%; }
-    select, button { border:1px solid var(--border); border-radius:7px; background:var(--card); color:var(--text); padding:7px; }
-    button { cursor:pointer; font-weight:600; }
-    button:disabled, select:disabled, input:disabled { cursor:not-allowed; opacity:.55; }
-    button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
-    button.danger { color:var(--danger); border-color:color-mix(in srgb,var(--danger) 45%,var(--border)); }
-    button.danger-confirm { background:var(--danger); border-color:var(--danger); color:#fff; }
-    button:focus-visible, select:focus-visible, input:focus-visible, .mode-choice:has(input:focus-visible) { outline:3px solid color-mix(in srgb,var(--accent) 45%,transparent); outline-offset:2px; }
-    output { min-width:52px; text-align:right; color:var(--accent); font-weight:700; }
-    .muted, .help { color:var(--muted); font-size:12px; }
-    .help { margin:4px 0 8px; }
-    .save-status { color:var(--accent); font-size:12px; min-width:45px; text-align:right; }
-    #sessionStatus[data-state="error"] { color:var(--danger); }
-    .actions { display:flex; gap:7px; }
-    .actions button { flex:1; }
-    .toggle-row { display:flex; align-items:flex-start; gap:9px; margin:10px 0; cursor:pointer; }
-    .toggle-row input { margin-top:2px; flex:0 0 auto; }
-    .toggle-copy { display:grid; gap:1px; font-weight:400; }
-    .toggle-copy strong { font-weight:600; }
-    .dependent { margin:6px 0 11px 23px; padding:4px 0 2px 10px; border-left:2px solid var(--border); }
-    .field { display:grid; gap:5px; margin:9px 0; }
-    .range-scale { display:flex; justify-content:space-between; color:var(--muted); font-size:11px; margin-top:-3px; }
-    .mode-fieldset { border:0; padding:0; margin:8px 0 11px; min-width:0; }
-    .mode-fieldset legend { margin-bottom:6px; }
-    .segmented { display:grid; grid-template-columns:1fr 1fr; gap:5px; padding:3px; border:1px solid var(--border); border-radius:9px; background:var(--bg); }
-    .mode-choice { position:relative; cursor:pointer; border-radius:6px; text-align:center; padding:7px 6px; font-weight:600; color:var(--muted); }
-    .mode-choice input { position:absolute; opacity:0; pointer-events:none; }
-    .mode-choice:has(input:checked) { color:var(--accent); background:var(--card); box-shadow:0 1px 3px color-mix(in srgb,var(--text) 15%,transparent); }
-    .shortcut { font-family:ui-monospace,monospace; }
-    .shortcut-list { display:grid; grid-template-columns:auto 1fr; gap:4px 9px; margin:8px 0; }
-    .full-width { width:100%; }
-    @media (prefers-reduced-motion:reduce) { * { scroll-behavior:auto!important; transition:none!important; } }
+    :root {
+      color-scheme: light dark;
+      --bg: #f5f6f8; --card: #ffffff; --surface-2: #eef1f5; --text: #1c2230; --muted: #586173; --border: #dde2ea;
+      --accent: #1d6ae0; --accent-hover: #1657bb; --accent-soft: #e7f0fd; --on-accent: #ffffff;
+      --ok: #0b7f62; --warn: #b26a00; --danger: #c53333; --switch-off: #c4cad4;
+      --radius: 12px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #13151a; --card: #1b1e25; --surface-2: #242832; --text: #e8ebf1; --muted: #a3acbb; --border: #323744;
+        --accent: #72a9ff; --accent-hover: #93bdff; --accent-soft: rgb(114 169 255 / 14%); --on-accent: #0c1220;
+        --ok: #4cc9a0; --warn: #f0b04a; --danger: #ff8080; --switch-off: #4a5160;
+      }
+    }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    body { width: 360px; max-height: 600px; overflow-y: auto; margin: 0; padding: 12px; font: 13px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); }
+    button, select, input { font: inherit; color: inherit; }
+    p { margin: 6px 0; }
+
+    .icon { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+    .app-header { display: flex; align-items: center; justify-content: space-between; margin: 2px 2px 10px; }
+    .brand { display: flex; align-items: center; gap: 8px; }
+    .logo { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; background: var(--accent); color: var(--on-accent); }
+    .logo .icon { width: 15px; height: 15px; }
+    h1 { margin: 0; font-size: 16px; font-weight: 700; }
+    .save-status { min-width: 45px; color: var(--ok); font-size: 12px; font-weight: 600; text-align: right; }
+
+    .card { margin-bottom: 8px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); }
+    .eyebrow { margin: 0; color: var(--muted); font-size: 11px; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; }
+    .muted, .help { color: var(--muted); font-size: 12px; }
+    .help { margin: 6px 0 2px; }
+    .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .field { display: grid; gap: 5px; margin: 10px 0; }
+    .field-label { font-weight: 600; }
+
+    select { width: 100%; padding: 7px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); }
+    input[type=range] { width: 100%; margin: 6px 0 0; accent-color: var(--accent); }
+    output { min-width: 52px; color: var(--accent); font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+    .range-scale { display: flex; justify-content: space-between; margin-top: -2px; color: var(--muted); font-size: 11px; }
+
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 34px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); font-weight: 600; cursor: pointer; }
+    .btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+    .btn:disabled { opacity: .55; cursor: not-allowed; }
+    .btn.primary { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
+    .btn.primary:hover:not(:disabled) { border-color: var(--accent-hover); background: var(--accent-hover); color: var(--on-accent); }
+    .btn.block { width: 100%; min-height: 38px; }
+    .btn.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, var(--border)); }
+    .btn.danger-confirm { background: var(--danger); border-color: var(--danger); color: #fff; }
+    .icon-btn { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; }
+    .icon-btn:hover { background: var(--surface-2); color: var(--text); }
+    button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-visible, .mode-choice:has(input:focus-visible) { outline: 3px solid color-mix(in srgb, var(--accent) 45%, transparent); outline-offset: 2px; }
+
+    /* Now */
+    .now-row { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
+    .now-row > div { flex: 1; min-width: 0; }
+    .status-dot { flex: none; width: 9px; height: 9px; margin-top: 4px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 4px color-mix(in srgb, var(--ok) 18%, transparent); }
+    .now:has(#sessionStatus[data-state="error"]) .status-dot { background: var(--warn); box-shadow: 0 0 0 4px color-mix(in srgb, var(--warn) 18%, transparent); }
+    #sessionStatus { margin-top: 2px; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+    #sessionStatus[data-state="error"] { color: var(--text); font-weight: 500; }
+    .now .field { margin: 0 0 10px; }
+
+    /* Speed */
+    .chips { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin: 10px 0 2px; padding: 3px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-2); }
+    .chip { padding: 5px 0; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-weight: 600; font-variant-numeric: tabular-nums; cursor: pointer; }
+    .chip:hover { color: var(--text); }
+    .chip.active { background: var(--card); color: var(--accent); box-shadow: 0 1px 3px rgb(0 0 0 / 12%); }
+
+    /* Collapsible sections */
+    details.section { padding: 0; }
+    details.section > summary { display: flex; align-items: center; gap: 10px; padding: 11px 12px; list-style: none; cursor: pointer; border-radius: var(--radius); }
+    details.section > summary::-webkit-details-marker { display: none; }
+    details.section > summary:hover { background: color-mix(in srgb, var(--surface-2) 60%, transparent); }
+    .summary-text { flex: 1; display: grid; }
+    .summary-text h2, .summary-text strong { margin: 0; font-size: 14px; font-weight: 650; }
+    .summary-text small { color: var(--muted); font-size: 12px; }
+    .chevron { color: var(--muted); transition: transform .15s; }
+    details[open] > summary .chevron { transform: rotate(180deg); }
+    .section-body { padding: 0 12px 12px; }
+    .divider { height: 1px; margin: 10px 0; background: var(--border); }
+    .group-label { margin: 12px 0 2px; }
+
+    /* Switches */
+    .switch-row { display: flex; align-items: flex-start; gap: 10px; margin: 10px 0; cursor: pointer; }
+    .switch-copy { display: grid; gap: 1px; }
+    .switch-copy strong { font-weight: 600; }
+    .switch-copy span { color: var(--muted); font-size: 12px; }
+    /* Firefox draws no ::before on checkboxes, so the knob is a gradient. */
+    input.switch {
+      appearance: none; flex: none; width: 34px; height: 20px; margin: 0; border-radius: 999px; cursor: pointer;
+      background: radial-gradient(circle at 10px 50%, #fff 0 7px, transparent 7.5px) no-repeat, var(--switch-off);
+    }
+    input.switch:checked { background: radial-gradient(circle at 24px 50%, #fff 0 7px, transparent 7.5px) no-repeat, var(--accent); }
+    input.switch:disabled { opacity: .5; cursor: not-allowed; }
+    .dependent { margin: -2px 0 10px 44px; }
+
+    .segmented { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 3px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-2); }
+    .mode-fieldset { min-width: 0; margin: 4px 0 10px; padding: 0; border: 0; }
+    .mode-fieldset legend { margin-bottom: 6px; padding: 0; font-weight: 600; }
+    .mode-choice { position: relative; padding: 6px; border-radius: 6px; color: var(--muted); font-weight: 600; text-align: center; cursor: pointer; }
+    .mode-choice input { position: absolute; opacity: 0; pointer-events: none; }
+    .mode-choice:has(input:checked) { background: var(--card); color: var(--accent); box-shadow: 0 1px 3px rgb(0 0 0 / 12%); }
+
+    .shortcut-list { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; align-items: center; margin: 4px 0 8px; color: var(--muted); }
+    kbd { padding: 1px 5px; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 5px; background: var(--card); color: var(--text); font: 600 11px/1.5 ui-monospace, Consolas, monospace; white-space: nowrap; }
+    .full-width { width: 100%; }
+
+    @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; } }
   </style>
 </head>
 <body>
+  <svg xmlns="http://www.w3.org/2000/svg" hidden>
+    <symbol id="i-headphones" viewBox="0 0 24 24"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36L21 8"/><path d="M21 3v5h-5"/></symbol>
+    <symbol id="i-window" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  </svg>
+
   <header class="app-header">
-    <h1>Alura Flow</h1>
+    <div class="brand">
+      <span class="logo" aria-hidden="true"><svg class="icon"><use href="#i-headphones"/></svg></span>
+      <h1>Alura Flow</h1>
+    </div>
     <span id="saveStatus" class="save-status" role="status" aria-live="polite"></span>
   </header>
 
-  <section class="card" aria-labelledby="sessionHeading">
-    <h2 id="sessionHeading">Curso controlado</h2>
-    <div class="stack">
-      <label class="muted" for="controlledTab">Aba da Alura</label>
-      <select id="controlledTab"><option value="">Procurando abas…</option></select>
-      <div id="sessionStatus" class="muted" role="status" aria-live="polite">Conectando…</div>
-      <div class="actions">
-        <button id="refreshTabs">Atualizar</button>
-        <button id="openCompanion" class="primary">Abrir companion</button>
+  <section class="card now" aria-labelledby="sessionHeading">
+    <div class="now-row">
+      <span class="status-dot" aria-hidden="true"></span>
+      <div>
+        <h2 id="sessionHeading" class="eyebrow">Aula atual</h2>
+        <div id="sessionStatus" role="status" aria-live="polite">Conectando…</div>
       </div>
+      <button id="refreshTabs" class="icon-btn" title="Atualizar abas" aria-label="Atualizar abas"><svg class="icon"><use href="#i-refresh"/></svg></button>
     </div>
+    <div class="field">
+      <label class="muted" for="controlledTab">Aba controlada</label>
+      <select id="controlledTab"><option value="">Procurando abas…</option></select>
+    </div>
+    <button id="openCompanion" class="btn primary block"><svg class="icon"><use href="#i-window"/></svg>Abrir companion</button>
   </section>
 
-  <section class="card" aria-labelledby="playbackHeading">
-    <h2 id="playbackHeading">Vídeos</h2>
-    <div class="row"><label id="speedLabel" for="speedSlider">Velocidade padrão</label><output id="speedValue">1x</output></div>
-    <input type="range" id="speedSlider" min="0.5" max="4" step="0.25" value="1">
+  <section class="card" aria-labelledby="speedLabel">
+    <div class="row"><label id="speedLabel" class="field-label" for="speedSlider">Velocidade padrão</label><output id="speedValue">1x</output></div>
+    <div class="chips" role="group" aria-label="Velocidades rápidas">
+      <button class="chip" data-speed-preset="1">1x</button>
+      <button class="chip" data-speed-preset="1.25">1,25</button>
+      <button class="chip" data-speed-preset="1.5">1,5</button>
+      <button class="chip" data-speed-preset="1.75">1,75</button>
+      <button class="chip" data-speed-preset="2">2x</button>
+    </div>
+    <input type="range" id="speedSlider" min="0.5" max="4" step="0.25" value="1" aria-describedby="speedScopeHint">
     <div class="range-scale" aria-hidden="true"><span>0,5x</span><span>4x</span></div>
     <p id="speedScopeHint" class="help">Aplicada a todos os cursos.</p>
-    <label class="toggle-row"><input type="checkbox" id="perCourseToggle"><span class="toggle-copy"><strong>Lembrar velocidade por curso</strong><span class="muted">Mantém uma velocidade diferente para cada curso.</span></span></label>
-    <label class="toggle-row"><input type="checkbox" id="autoPlayToggle"><span class="toggle-copy"><strong>Iniciar vídeos automaticamente</strong></span></label>
-    <label class="toggle-row"><input type="checkbox" id="autoAdvanceToggle" aria-controls="autoAdvanceOptions"><span class="toggle-copy"><strong>Avançar automaticamente</strong></span></label>
-    <div id="autoAdvanceOptions" class="dependent">
-      <div class="row"><label for="advanceDelay">Aguardar antes de avançar</label><select id="advanceDelay" style="width:auto"><option value="0">Imediato</option><option value="3">3 s</option><option value="5">5 s</option><option value="10">10 s</option><option value="15">15 s</option></select></div>
-    </div>
-    <label class="toggle-row"><input type="checkbox" id="minimizeToggle"><span class="toggle-copy"><strong>Minimizar companion durante o vídeo</strong></span></label>
-
-    <div class="divider"></div>
-    <h3>Após o vídeo</h3>
-    <label class="toggle-row"><input type="checkbox" id="transcriptAfterVideoToggle" aria-controls="transcriptOptions"><span class="toggle-copy"><strong>Ler a transcrição</strong><span class="muted">Abre a transcrição na barra lateral antes de avançar.</span></span></label>
-    <div id="transcriptOptions" class="dependent">
-      <p class="help">Usa Leitura rápida e respeita “Iniciar automaticamente” na seção Leitura.</p>
-      <div class="row"><label for="transcriptRsvpWpm">Velocidade de leitura</label><output id="transcriptRsvpWpmValue">300 ppm</output></div>
-      <input type="range" id="transcriptRsvpWpm" min="100" max="800" step="25" value="300">
-      <div class="range-scale" aria-hidden="true"><span>100 ppm</span><span>800 ppm</span></div>
-    </div>
+    <label class="switch-row"><input type="checkbox" id="perCourseToggle" class="switch" role="switch"><span class="switch-copy"><strong>Lembrar por curso</strong><span>Cada curso guarda a sua velocidade.</span></span></label>
   </section>
 
-  <section class="card" aria-labelledby="readingHeading">
-    <h2 id="readingHeading">Leitura</h2>
-    <fieldset class="mode-fieldset">
-      <legend>Modo padrão</legend>
-      <div class="segmented" role="radiogroup" aria-label="Modo padrão de leitura">
-        <label class="mode-choice"><input type="radio" name="readingMode" id="readingModeTts" value="tts"><span>Ouvir com voz</span></label>
-        <label class="mode-choice"><input type="radio" name="readingMode" id="readingModeRsvp" value="rsvp"><span>Leitura rápida</span></label>
+  <details class="card section" data-section="playback" open>
+    <summary><span class="summary-text"><strong>Reprodução</strong><small>Início, avanço e transcrição</small></span><svg class="icon chevron"><use href="#i-chevron"/></svg></summary>
+    <div class="section-body">
+      <label class="switch-row"><input type="checkbox" id="autoPlayToggle" class="switch" role="switch"><span class="switch-copy"><strong>Iniciar vídeos automaticamente</strong></span></label>
+      <label class="switch-row"><input type="checkbox" id="autoAdvanceToggle" class="switch" role="switch" aria-controls="autoAdvanceOptions"><span class="switch-copy"><strong>Avançar automaticamente</strong><span>Com contagem regressiva e opção de desfazer.</span></span></label>
+      <div id="autoAdvanceOptions" class="dependent">
+        <div class="row"><label for="advanceDelay">Aguardar antes de avançar</label><select id="advanceDelay" style="width:auto"><option value="0">Imediato</option><option value="3">3 s</option><option value="5">5 s</option><option value="10">10 s</option><option value="15">15 s</option></select></div>
       </div>
-    </fieldset>
-    <label class="toggle-row"><input type="checkbox" id="autoReadToggle"><span class="toggle-copy"><strong>Iniciar automaticamente</strong><span class="muted">Aplica-se às aulas de texto e às transcrições abertas após vídeos.</span></span></label>
+      <label class="switch-row"><input type="checkbox" id="minimizeToggle" class="switch" role="switch"><span class="switch-copy"><strong>Minimizar companion durante o vídeo</strong></span></label>
 
-    <div id="ttsOptions" class="dependent" aria-labelledby="readingModeTts">
-      <div class="field"><label for="voiceSelect">Voz</label><select id="voiceSelect"><option value="">Voz automática do idioma</option></select></div>
-      <div class="row"><label for="ttsRate">Ritmo da voz</label><output id="ttsRateValue">1.15x</output></div>
-      <input type="range" id="ttsRate" min="0.5" max="2" step="0.05" value="1.15">
-      <div class="range-scale" aria-hidden="true"><span>0,5x</span><span>2x</span></div>
+      <div class="divider"></div>
+      <h3 class="eyebrow group-label">Após o vídeo</h3>
+      <label class="switch-row"><input type="checkbox" id="transcriptAfterVideoToggle" class="switch" role="switch" aria-controls="transcriptOptions"><span class="switch-copy"><strong>Ler a transcrição</strong><span>Mostra a transcrição em leitura rápida antes de avançar.</span></span></label>
+      <div id="transcriptOptions" class="dependent">
+        <div class="row"><label for="transcriptRsvpWpm">Velocidade de leitura</label><output id="transcriptRsvpWpmValue">300 ppm</output></div>
+        <input type="range" id="transcriptRsvpWpm" min="100" max="800" step="25" value="300">
+        <div class="range-scale" aria-hidden="true"><span>100</span><span>800 ppm</span></div>
+        <p class="help">Começa sozinha se “Iniciar automaticamente” estiver ligado em Leitura.</p>
+      </div>
     </div>
+  </details>
 
-    <div id="rsvpOptions" class="dependent" aria-labelledby="readingModeRsvp">
-      <div class="row"><label for="rsvpWpm">Palavras por minuto</label><output id="rsvpWpmValue">300 ppm</output></div>
-      <input type="range" id="rsvpWpm" min="100" max="800" step="25" value="300">
-      <div class="range-scale" aria-hidden="true"><span>100 ppm</span><span>800 ppm</span></div>
+  <details class="card section" data-section="reading">
+    <summary><span class="summary-text"><strong>Leitura</strong><small>Aulas de texto, quizzes e transcrições</small></span><svg class="icon chevron"><use href="#i-chevron"/></svg></summary>
+    <div class="section-body">
+      <fieldset class="mode-fieldset">
+        <legend>Modo padrão</legend>
+        <div class="segmented" role="radiogroup" aria-label="Modo padrão de leitura">
+          <label class="mode-choice"><input type="radio" name="readingMode" id="readingModeTts" value="tts"><span>Ouvir com voz</span></label>
+          <label class="mode-choice"><input type="radio" name="readingMode" id="readingModeRsvp" value="rsvp"><span>Leitura rápida</span></label>
+        </div>
+      </fieldset>
+      <label class="switch-row"><input type="checkbox" id="autoReadToggle" class="switch" role="switch"><span class="switch-copy"><strong>Iniciar automaticamente</strong><span>Textos, transcrições e, no modo voz, as perguntas dos quizzes.</span></span></label>
+
+      <div id="ttsOptions" aria-labelledby="readingModeTts">
+        <div class="field"><label class="field-label" for="voiceSelect">Voz</label><select id="voiceSelect"><option value="">Voz automática do idioma</option></select></div>
+        <div class="row"><label class="field-label" for="ttsRate">Ritmo da voz</label><output id="ttsRateValue">1.15x</output></div>
+        <input type="range" id="ttsRate" min="0.5" max="2" step="0.05" value="1.15">
+        <div class="range-scale" aria-hidden="true"><span>0,5x</span><span>2x</span></div>
+      </div>
+
+      <div id="rsvpOptions" aria-labelledby="readingModeRsvp">
+        <div class="row"><label class="field-label" for="rsvpWpm">Palavras por minuto</label><output id="rsvpWpmValue">300 ppm</output></div>
+        <input type="range" id="rsvpWpm" min="100" max="800" step="25" value="300">
+        <div class="range-scale" aria-hidden="true"><span>100</span><span>800 ppm</span></div>
+      </div>
     </div>
-  </section>
+  </details>
 
-  <section class="card" aria-labelledby="shortcutsHeading">
-    <h2 id="shortcutsHeading">Atalhos globais</h2>
-    <label class="toggle-row"><input type="checkbox" id="shortcutsToggle" aria-controls="shortcutDetails"><span class="toggle-copy"><strong>Habilitar atalhos</strong><span class="muted">Funcionam enquanto o Firefox estiver aberto.</span></span></label>
-    <div id="shortcutDetails" class="dependent">
-      <div class="shortcut-list muted"><span class="shortcut">Ctrl+Alt+P</span><span>Reproduzir ou pausar</span><span class="shortcut">Ctrl+Alt+N</span><span>Próxima lição</span><span class="shortcut">Ctrl+Alt+S</span><span>Alterar velocidade</span></div>
-      <p id="shortcutStatus" class="muted" role="status" aria-live="polite">Verificando os atalhos…</p>
-      <button id="repairSpeedShortcut" class="full-width" hidden>Restaurar Ctrl+Alt+S</button>
+  <details class="card section" data-section="shortcuts">
+    <summary><span class="summary-text"><h2 id="shortcutsHeading">Atalhos e teclas de mídia</h2><small>Controle sem trocar de janela</small></span><svg class="icon chevron"><use href="#i-chevron"/></svg></summary>
+    <div class="section-body">
+      <label class="switch-row"><input type="checkbox" id="mediaKeysToggle" class="switch" role="switch"><span class="switch-copy"><strong>Teclas de mídia</strong><span>⏮ ⏭ no teclado, fone ou painel do sistema trocam de aula durante os vídeos, mesmo em outro programa.</span></span></label>
+      <label class="switch-row"><input type="checkbox" id="shortcutsToggle" class="switch" role="switch" aria-controls="shortcutDetails"><span class="switch-copy"><strong>Atalhos do Firefox</strong><span>Funcionam em qualquer aba do Firefox.</span></span></label>
+      <div id="shortcutDetails" class="dependent">
+        <div class="shortcut-list"><kbd>Ctrl+Alt+P</kbd><span>Reproduzir ou pausar</span><kbd>Ctrl+Alt+N</kbd><span>Próxima lição</span><kbd>Ctrl+Alt+S</kbd><span>Alterar velocidade</span></div>
+        <p id="shortcutStatus" class="muted" role="status" aria-live="polite">Verificando os atalhos…</p>
+        <button id="repairSpeedShortcut" class="btn full-width" hidden>Restaurar Ctrl+Alt+S</button>
+      </div>
+      <div class="divider"></div>
+      <h3 class="eyebrow group-label">No companion</h3>
+      <div class="shortcut-list"><kbd>Espaço</kbd><span>Ouvir, iniciar ou pausar a leitura</span><kbd>← →</kbd><span>Frase anterior ou próxima (leitura rápida)</span><kbd>1–9 · A–Z</kbd><span>Escolher a alternativa do quiz</span><kbd>Enter</kbd><span>Avançar depois de acertar</span></div>
     </div>
-  </section>
+  </details>
 
-  <section class="card" aria-labelledby="historyHeading">
-    <h2 id="historyHeading">Histórico e dados</h2>
-    <p id="progressSummary" class="muted" aria-live="polite">Nenhum progresso local.</p>
-    <button id="clearHistory" class="danger full-width" disabled>Limpar histórico…</button>
-    <p id="clearHistoryHint" class="muted" role="status" aria-live="polite"></p>
-  </section>
+  <details class="card section" data-section="data">
+    <summary><span class="summary-text"><h2 id="historyHeading">Histórico e dados</h2><small>Fica só neste dispositivo</small></span><svg class="icon chevron"><use href="#i-chevron"/></svg></summary>
+    <div class="section-body">
+      <p id="progressSummary" class="muted" aria-live="polite">Nenhum progresso local.</p>
+      <button id="clearHistory" class="btn danger full-width" disabled>Limpar histórico…</button>
+      <p id="clearHistoryHint" class="muted" role="status" aria-live="polite"></p>
+    </div>
+  </details>
+
   <script src="popup.js"></script>
 </body>
 </html>

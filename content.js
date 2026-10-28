@@ -8,6 +8,7 @@ const settings = {
     playbackSpeed: 1,
     autoReadEnabled: true,
     rsvpAfterVideoEnabled: false,
+    mediaKeysEnabled: true,
     perCourseSettings: true,
     courseProfiles: {}
 };
@@ -17,6 +18,8 @@ let lastSuccessfulReport = 0;
 let diagnosticSentFor = '';
 let transitionTimer = null;
 let countdownTimer = null;
+let autoAdvanceLessonId = null;
+let quizFeedbackDebounce = null;
 let observerDebounce = null;
 let activeVideoTranscriptLessonId = null;
 let transcriptLoadingPending = false;
@@ -33,11 +36,28 @@ function getNextButton() {
             .find(label => /^(avançar|próxima)$/i.test(label.textContent.trim()))?.closest('button, a') || null;
 }
 
+function sidebarLessonLinks() {
+    return Array.from(document.querySelectorAll('ul li.group a[href*="/task/"]'));
+}
+
+function currentSidebarIndex(links) {
+    const lessonId = AluraFlowCore.lessonIdFromUrl(location.href);
+    const byUrl = links.findIndex(link => AluraFlowCore.lessonIdFromUrl(link.href) === lessonId);
+    if (byUrl >= 0) return byUrl;
+    return links.findIndex(link => link.matches('[aria-current="page"], .bg-surface-default, .border-l-brand-default'));
+}
+
 function getPrevButton() {
     const oldButton = document.querySelector('.task-actions-button-prev');
     if (oldButton) return oldButton;
     const buttons = Array.from(document.querySelectorAll('button[data-slot="ds-button-root"], a[data-slot="ds-button-root"]'));
-    return buttons.find(button => /anterior|voltar/i.test(button.textContent.trim())) || null;
+    const labelled = buttons.find(button => /anterior|voltar/i.test(button.textContent.trim()));
+    if (labelled) return labelled;
+    // The current lesson page only has "Avançar": go back through the sidebar list,
+    // which shows the lessons of the current section.
+    const links = sidebarLessonLinks();
+    const index = currentSidebarIndex(links);
+    return index > 0 ? links[index - 1] : null;
 }
 
 function lessonContext() {
@@ -52,10 +72,7 @@ function lessonContext() {
 }
 
 function effectivePlaybackSpeed(courseId) {
-    if (settings.perCourseSettings && settings.courseProfiles?.[courseId]?.playbackSpeed) {
-        return Number(settings.courseProfiles[courseId].playbackSpeed);
-    }
-    return Number(settings.playbackSpeed) || 1;
+    return AluraFlowCore.effectivePlaybackSpeed(settings, courseId);
 }
 
 function sanitizeClone(source) {
@@ -401,6 +418,8 @@ function attachVideoListeners(video, context) {
     video.addEventListener('loadedmetadata', applySpeed);
     video.addEventListener('play', () => {
         video.dataset.afAutoplayStarted = 'true';
+        // Re-assert after each play in case the page's player registered its own handlers.
+        updateMediaSessionHandlers();
         chrome.runtime.sendMessage({ type: 'VIDEO_STATE_CHANGED', status: 'playing' });
     });
     video.addEventListener('pause', () => chrome.runtime.sendMessage({ type: 'VIDEO_STATE_CHANGED', status: 'paused' }));
@@ -531,6 +550,7 @@ function reportState(force = false, forceBind = false) {
     if (activeVideoTranscriptLessonId && activeVideoTranscriptLessonId !== context.lessonId) {
         activeVideoTranscriptLessonId = null;
     }
+    if (autoAdvanceLessonId && autoAdvanceLessonId !== context.lessonId) cancelAutoAdvance(true);
 
     // Opening the transcription sidebar can temporarily remove the player from
     // the lesson DOM. Keep the explicit loading state instead of diagnosing the
@@ -601,8 +621,8 @@ function predictNextLesson() {
         const link = oldCurrent.nextElementSibling.querySelector('.task-menu-nav-item-link');
         return link?.classList.contains('task-menu-nav-item-link-VIDEO') ? 'PLAYER' : 'CONTENT';
     }
-    const links = Array.from(document.querySelectorAll('ul li.group a[href*="/task/"]'));
-    const index = links.findIndex(link => link.matches('.bg-surface-default, .border-l-brand-default, [aria-current="page"]'));
+    const links = sidebarLessonLinks();
+    const index = currentSidebarIndex(links);
     if (index >= 0 && links[index + 1]) return links[index + 1].querySelector('span.font-jetbrains-mono') ? 'PLAYER' : 'CONTENT';
     return null;
 }
@@ -617,11 +637,14 @@ function cancelAutoAdvance(notify = true) {
     if (countdownTimer) clearInterval(countdownTimer);
     transitionTimer = null;
     countdownTimer = null;
+    autoAdvanceLessonId = null;
     if (notify) chrome.runtime.sendMessage({ type: 'AUTO_ADVANCE_CANCELLED' });
 }
 
 function scheduleAutoAdvance(reason) {
     cancelAutoAdvance(false);
+    const lessonId = lessonContext().lessonId;
+    autoAdvanceLessonId = lessonId;
     const delaySeconds = Math.max(0, Number(settings.autoAdvanceDelay) || 0);
     let remaining = delaySeconds;
     const announce = () => chrome.runtime.sendMessage({ type: 'AUTO_ADVANCE_COUNTDOWN', reason, remaining });
@@ -634,6 +657,9 @@ function scheduleAutoAdvance(reason) {
     }
     transitionTimer = setTimeout(() => {
         cancelAutoAdvance(false);
+        // The page may have moved on during the countdown (Alura's own autoplay or
+        // a manual click); clicking "next" now would skip the lesson now on screen.
+        if (lessonContext().lessonId !== lessonId) return;
         const nextButton = getNextButton();
         if (!nextButton) return;
         activeVideoTranscriptLessonId = null;
@@ -643,9 +669,53 @@ function scheduleAutoAdvance(reason) {
     }, delaySeconds * 1000);
 }
 
+function goToNextLesson() {
+    cancelAutoAdvance(false);
+    activeVideoTranscriptLessonId = null;
+    const button = getNextButton();
+    if (!button) return false;
+    handleTransition();
+    button.click();
+    return true;
+}
+
+function goToPreviousLesson() {
+    cancelAutoAdvance(false);
+    activeVideoTranscriptLessonId = null;
+    const button = getPrevButton();
+    if (!button) return false;
+    button.click();
+    return true;
+}
+
+// Keyboard and headset media keys (and the Windows media overlay) reach the page
+// through the Media Session API whenever its video is Firefox's active media.
+// Play/pause keeps Firefox's default handling; next/previous track change lessons.
+function updateMediaSessionHandlers() {
+    const session = navigator.mediaSession;
+    if (typeof session?.setActionHandler !== 'function') return;
+    const enabled = settings.mediaKeysEnabled !== false;
+    const handlers = { nexttrack: goToNextLesson, previoustrack: goToPreviousLesson };
+    Object.entries(handlers).forEach(([action, handler]) => {
+        try {
+            session.setActionHandler(action, enabled ? () => { handler(); } : null);
+        } catch (_) {
+            // This Firefox build does not support the action.
+        }
+    });
+}
+
+// Cheap check that runs before the costlier quiz parsing: every supported quiz
+// layout contains one of these elements.
+function pageMayHaveQuiz() {
+    return Boolean(document.querySelector('.alternativeList, .choiceable-aria-feedback, li button.group'));
+}
+
 function watchQuizFeedback() {
     let lastFeedback = '';
-    const observer = new MutationObserver(() => {
+    const checkFeedback = () => {
+        quizFeedbackDebounce = null;
+        if (!pageMayHaveQuiz()) return;
         const quiz = getNewStructureQuizElements();
         const oldFeedback = document.querySelector('.choiceable-aria-feedback')?.textContent.toLocaleLowerCase('pt-BR') || '';
         const newOptions = quiz ? Array.from(quiz.options) : [];
@@ -669,8 +739,19 @@ function watchQuizFeedback() {
             if (correctIds.length) chrome.runtime.sendMessage({ type: 'QUIZ_REVEAL_CORRECT', correctIds });
         }
         reportState(true);
+    };
+    // The video player rewrites attributes several times per second; coalesce
+    // bursts and only watch the attributes quiz feedback is expressed through.
+    const observer = new MutationObserver(() => {
+        if (quizFeedbackDebounce) return;
+        quizFeedbackDebounce = setTimeout(checkFeedback, 100);
     });
-    observer.observe(document.body, { childList: true, subtree: true, attributes: true });
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['class', 'aria-label', 'aria-selected', 'aria-checked', 'disabled']
+    });
 }
 
 function setupObservers() {
@@ -679,16 +760,10 @@ function setupObservers() {
         observerDebounce = setTimeout(() => reportState(), 150);
     });
     observer.observe(document.body, { childList: true, subtree: true });
+    // Alura's in-page navigation is caught by the DOM observer above and the
+    // polling below: a content script cannot wrap the page's history.pushState.
     window.addEventListener('popstate', () => setTimeout(() => reportState(true), 100));
     window.addEventListener('hashchange', () => setTimeout(() => reportState(true), 100));
-    ['pushState', 'replaceState'].forEach(method => {
-        const original = history[method];
-        history[method] = function (...args) {
-            const result = original.apply(this, args);
-            setTimeout(() => reportState(true), 100);
-            return result;
-        };
-    });
     setInterval(() => reportState(), 2000);
     watchQuizFeedback();
 }
@@ -704,11 +779,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         chrome.runtime.sendMessage({ type: 'VIDEO_PLAY_FAILED', reason: 'companion', error: 'video-not-found' });
         reportState(true);
     } else if (message.type === 'COMMAND_NEXT' || message.type === 'FINISH_READING') {
-        cancelAutoAdvance(false);
-        activeVideoTranscriptLessonId = null;
-        const button = getNextButton();
-        if (button) { handleTransition(); button.click(); }
-        else {
+        if (!goToNextLesson()) {
             sendResponse?.({ ok: false, error: 'Botão de próxima lição não encontrado.' });
             return false;
         }
@@ -717,17 +788,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     } else if (message.type === 'RETRY_VIDEO_TRANSCRIPTION' && (video || isVideoLesson(video))) {
         handleVideoEnded(video || getVideoElement(), lessonContext());
     } else if (message.type === 'COMMAND_PREV') {
-        cancelAutoAdvance(false);
-        activeVideoTranscriptLessonId = null;
-        const button = getPrevButton();
-        if (button) button.click();
-    } else if (message.type === 'COMMAND_CYCLE_SPEED' && video) {
-        const speeds = [1, 1.25, 1.5, 2];
-        const currentIndex = speeds.findIndex(speed => Math.abs(speed - video.playbackRate) < 0.05);
-        video.playbackRate = speeds[(currentIndex + 1 + speeds.length) % speeds.length];
+        goToPreviousLesson();
     } else if (message.type === 'UPDATE_SPEED') {
-        settings.playbackSpeed = Number(message.speed) || 1;
-        if (video) video.playbackRate = settings.playbackSpeed;
+        // Only the video changes here: the stored default or course speed reaches
+        // `settings` through storage.onChanged, so a course speed never replaces the default.
+        const speed = Number(message.speed);
+        if (video && Number.isFinite(speed) && speed > 0) video.playbackRate = speed;
     } else if (message.type === 'SELECT_OPTION') {
         const item = document.querySelector(`.alternativeList-item[data-alternative-id="${CSS.escape(String(message.optionId))}"]`);
         if (item) item.querySelector('label, input')?.click();
@@ -762,6 +828,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
         activeVideoTranscriptLessonId = null;
         reportState(true);
     }
+    if (changes.mediaKeysEnabled) updateMediaSessionHandlers();
     if (changes.playbackSpeed || changes.courseProfiles || changes.perCourseSettings) {
         const video = getVideoElement();
         if (video) video.playbackRate = effectivePlaybackSpeed(lessonContext().courseId);
@@ -772,6 +839,7 @@ function init() {
     chrome.storage.local.get(Object.keys(settings), stored => {
         Object.assign(settings, stored);
         document.addEventListener('click', blockNativeContinueDuringTranscript, true);
+        updateMediaSessionHandlers();
         setupObservers();
         setTimeout(() => reportState(true), 300);
     });

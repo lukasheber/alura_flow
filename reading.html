@@ -7,589 +7,423 @@
     <title>Alura Flow Companion</title>
     <style>
         :root {
-            --bg-color: #fcfcfc;
-            --text-color: #333;
-            --header-bg: rgba(252, 252, 252, 0.95);
-            --accent-color: #2A7AE4;
-            --accent-hover: #0c5abb;
-            --btn-text: white;
-            --border-color: #eee;
-            --subtext-color: #666;
-
-            /* Quiz Colors */
-            --hint-bg: #f7f7f7;
-            --opt-bg: white;
-            --opt-border: #ddd;
-            --opt-hover-bg: #f0f7ff;
-            --selected-bg: #e6f1ff;
-            --selected-border: #2A7AE4;
-            --correct-bg: #f0fffc;
-            --correct-border: #00c4a7;
-            --wrong-bg: #ffe6e6;
-            --wrong-border: #e42a2a;
+            color-scheme: light dark;
+            --bg: #f5f6f8;
+            --surface: #ffffff;
+            --surface-2: #eef1f5;
+            --text: #1c2230;
+            --text-2: #586173;
+            --border: #dde2ea;
+            --accent: #1d6ae0;
+            --accent-hover: #1657bb;
+            --accent-soft: #e7f0fd;
+            --on-accent: #ffffff;
+            --success: #0b7f62;
+            --success-soft: #e2f5ee;
+            --danger: #c53333;
+            --danger-soft: #fdeceb;
+            --stage-bg: #12151b;
+            --stage-text: #f4f6fa;
+            --stage-focus: #ff6b6b;
+            --shadow: 0 1px 2px rgb(16 24 40 / 6%), 0 6px 20px rgb(16 24 40 / 8%);
+            --radius: 14px;
+            --radius-sm: 9px;
+            --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+            --mono: ui-monospace, "Cascadia Code", Consolas, monospace;
         }
 
         @media (prefers-color-scheme: dark) {
             :root {
-                --bg-color: #1e1e1e;
-                --text-color: #d4d4d4;
-                --header-bg: rgba(30, 30, 30, 0.95);
-                --accent-color: #3d8bfd;
-                --accent-hover: #5CA4FF;
-                --btn-text: #1e1e1e;
-                --border-color: #333;
-                --subtext-color: #aaa;
-
-                /* Quiz Colors Dark */
-                --hint-bg: #252526;
-                --opt-bg: #2d2d2d;
-                --opt-border: #444;
-                --opt-hover-bg: #3a3a3a;
-                --selected-bg: rgba(42, 122, 228, 0.2);
-                --selected-border: #5CA4FF;
-                --correct-bg: rgba(0, 196, 167, 0.15);
-                --correct-border: #00c4a7;
-                --wrong-bg: rgba(228, 42, 42, 0.2);
-                --wrong-border: #ff5f5f;
+                --bg: #13151a;
+                --surface: #1b1e25;
+                --surface-2: #242832;
+                --text: #e8ebf1;
+                --text-2: #a3acbb;
+                --border: #323744;
+                --accent: #72a9ff;
+                --accent-hover: #93bdff;
+                --accent-soft: rgb(114 169 255 / 14%);
+                --on-accent: #0c1220;
+                --success: #4cc9a0;
+                --success-soft: rgb(76 201 160 / 14%);
+                --danger: #ff8080;
+                --danger-soft: rgb(255 128 128 / 14%);
+                --stage-bg: #0b0d11;
+                --shadow: 0 1px 2px rgb(0 0 0 / 30%), 0 6px 20px rgb(0 0 0 / 25%);
             }
 
-            img {
-                opacity: 0.85;
-            }
+            .prose img { opacity: 0.9; }
         }
 
+        * { box-sizing: border-box; }
+        [hidden], .hidden { display: none !important; }
+
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            padding: 0;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            line-height: 1.6;
             margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            font: 15px/1.55 var(--font);
             overflow-x: hidden;
         }
 
-        /* --- Header --- */
-        .global-header {
-            position: sticky;
-            top: 0;
-            background: var(--header-bg);
-            padding: 10px 20px;
-            border-bottom: 1px solid var(--border-color);
-            z-index: 100;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            backdrop-filter: blur(5px);
-            height: 40px;
+        button { font: inherit; color: inherit; }
+
+        .icon {
+            width: 18px;
+            height: 18px;
+            flex: none;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
         }
 
-        .header-left {
+        .icon.filled { fill: currentColor; stroke: none; }
+
+        kbd {
+            display: inline-block;
+            min-width: 1.6em;
+            padding: 0 5px;
+            border: 1px solid var(--border);
+            border-bottom-width: 2px;
+            border-radius: 5px;
+            background: var(--surface);
+            color: var(--text);
+            font: 600 11px/1.6 var(--mono);
+            text-align: center;
+        }
+
+        .eyebrow {
+            color: var(--text-2);
+            font-size: 11px;
+            font-weight: 650;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+
+        .kbd-hint {
+            margin: 12px 0 0;
+            color: var(--text-2);
+            font-size: 12px;
+            line-height: 2;
+        }
+
+        /* --- Buttons --- */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            min-height: 38px;
+            padding: 0 14px;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            background: var(--surface);
+            color: var(--text);
+            font-weight: 600;
+            font-size: 14px;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+        }
+
+        .btn:hover { border-color: var(--accent); color: var(--accent); }
+        .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+        .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+        .btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: var(--on-accent); }
+        .btn.ghost { border-color: transparent; background: transparent; }
+        .btn.ghost:hover { background: var(--accent-soft); }
+        .btn.small { min-height: 32px; padding: 0 12px; font-size: 13px; }
+        .btn.block { width: 100%; border-radius: var(--radius-sm); min-height: 44px; }
+
+        button:focus-visible, a:focus-visible, summary:focus-visible, [tabindex]:focus-visible, input:focus-visible {
+            outline: 3px solid color-mix(in srgb, var(--accent) 50%, transparent);
+            outline-offset: 2px;
+        }
+
+        /* --- Header --- */
+        .app-bar {
+            position: sticky;
+            top: 0;
+            z-index: 100;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
+            min-height: 60px;
+            padding: 10px 18px;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
         }
 
         #connectionLed {
-            width: 8px;
-            height: 8px;
+            flex: none;
+            width: 9px;
+            height: 9px;
             border-radius: 50%;
-            background-color: #ccc;
-            transition: background-color 0.3s;
+            background: var(--border);
+            transition: background-color 0.3s, box-shadow 0.3s;
         }
 
         #connectionLed.led-active {
-            background-color: #00c4a7;
-            box-shadow: 0 0 5px #00c4a7;
+            background: var(--success);
+            box-shadow: 0 0 0 4px color-mix(in srgb, var(--success) 20%, transparent);
         }
+
+        .title-block { min-width: 0; display: grid; gap: 1px; }
 
         #mainTitle {
             margin: 0;
-            color: var(--accent-color);
-            font-size: 0.9rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            font-weight: 600;
-            white-space: nowrap;
+            font-size: 15px;
+            font-weight: 650;
+            line-height: 1.3;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
             overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 300px;
         }
 
-        /* --- View Containers --- */
-        .mode-view {
-            padding: 20px;
-            opacity: 1;
-            transition: opacity 0.3s ease;
+        /* --- Banner --- */
+        .advance-banner {
+            position: sticky;
+            top: 68px;
+            z-index: 90;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin: 12px 16px 0;
+            padding: 10px 10px 10px 14px;
+            border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+            border-radius: var(--radius-sm);
+            background: var(--accent-soft);
+            box-shadow: var(--shadow);
+            font-size: 14px;
+            font-weight: 550;
         }
 
-        .mode-view.hidden {
-            display: none;
-            opacity: 0;
-        }
+        /* --- Views --- */
+        .mode-view { padding: 20px; }
 
-        /* --- LOADING VIEW --- */
-        #view-loading {
-            min-height: 360px;
+        .center-view {
+            min-height: calc(100vh - 61px);
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 16px;
-            color: var(--subtext-color);
+            gap: 14px;
             text-align: center;
         }
 
-        #view-loading.hidden { display: none; }
+        .badge-icon {
+            display: grid;
+            place-items: center;
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: var(--accent-soft);
+            color: var(--accent);
+        }
+
+        .badge-icon .icon { width: 28px; height: 28px; }
+
+        .center-view h2 { margin: 0; font-size: 18px; }
+        .center-view p { margin: 0; max-width: 34ch; color: var(--text-2); }
 
         .loading-spinner {
             width: 34px;
             height: 34px;
-            border: 3px solid var(--border-color);
-            border-top-color: var(--accent-color);
+            border: 3px solid var(--border);
+            border-top-color: var(--accent);
             border-radius: 50%;
             animation: loading-spin 0.8s linear infinite;
         }
 
-        #loadingMessage { margin: 0; }
-
         @keyframes loading-spin { to { transform: rotate(360deg); } }
 
-        /* --- PLAYER VIEW --- */
-        #view-player {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 400px;
-            /* Approximate center height */
-            text-align: center;
-        }
+        /* --- Player --- */
+        #view-player { gap: 22px; }
 
-        .video-placeholder {
-            margin-bottom: 30px;
-            color: var(--subtext-color);
-        }
+        #videoStatusText { color: var(--text-2); font-weight: 550; }
 
-        .video-placeholder .icon {
-            font-size: 3rem;
-            display: block;
-            margin-bottom: 10px;
-            opacity: 0.5;
-        }
-
-        .controls-wrapper {
-            display: flex;
-            gap: 20px;
-            margin-bottom: 30px;
-        }
+        .controls-wrapper { display: flex; align-items: center; gap: 22px; }
 
         .ctrl-btn {
-            background: none;
-            border: 2px solid var(--border-color);
+            display: grid;
+            place-items: center;
+            width: 52px;
+            height: 52px;
+            border: 1px solid var(--border);
             border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            font-size: 1.2rem;
+            background: var(--surface);
+            color: var(--text);
             cursor: pointer;
-            color: var(--text-color);
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            transition: border-color 0.15s, color 0.15s, transform 0.15s;
         }
 
-        .ctrl-btn:hover {
-            border-color: var(--accent-color);
-            color: var(--accent-color);
-            transform: scale(1.05);
+        .ctrl-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .ctrl-btn:active { transform: scale(0.96); }
+        .ctrl-btn .icon { width: 22px; height: 22px; }
+
+        #remotePlay {
+            width: 76px;
+            height: 76px;
+            border-color: var(--accent);
+            background: var(--accent);
+            color: var(--on-accent);
+            box-shadow: var(--shadow);
         }
+
+        #remotePlay:hover { background: var(--accent-hover); color: var(--on-accent); }
+        #remotePlay .icon { width: 30px; height: 30px; }
+        #remotePlay .icon-pause, #remotePlay[data-state="playing"] .icon-play { display: none; }
+        #remotePlay[data-state="playing"] .icon-pause { display: block; }
+
+        .speed-block { display: grid; gap: 8px; justify-items: center; }
 
         .speed-controls {
-            display: flex;
-            gap: 5px;
-            background: var(--hint-bg);
-            padding: 5px;
-            border-radius: 20px;
+            display: inline-flex;
+            gap: 2px;
+            padding: 3px;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            background: var(--surface-2);
         }
 
         .speed-btn {
-            background: none;
-            border: none;
-            padding: 5px 12px;
-            border-radius: 15px;
-            cursor: pointer;
-            font-size: 0.8rem;
-            color: var(--subtext-color);
-            transition: all 0.2s;
-        }
-
-        .speed-btn.active,
-        .speed-btn:hover {
-            background-color: var(--bg-color);
-            color: var(--accent-color);
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-        }
-
-        /* --- CONTENT VIEW (Text & Quiz) --- */
-        .content-container {
-            font-size: 1rem;
-        }
-
-        /* Styles shared with old reading.html */
-        .content-container h1,
-        .content-container h2,
-        .content-container h3 {
-            font-size: 1.15em !important;
-            margin-top: 1.5em;
-            margin-bottom: 0.5em;
-            color: var(--text-color);
+            min-width: 54px;
+            padding: 6px 10px;
+            border: 0;
+            border-radius: 999px;
+            background: transparent;
+            color: var(--text-2);
+            font-size: 13px;
             font-weight: 600;
+            font-variant-numeric: tabular-nums;
+            cursor: pointer;
         }
 
-        .content-container img {
-            max-width: 100%;
-            height: auto;
-            border-radius: 4px;
-            margin: 15px auto;
-            display: block;
-        }
+        .speed-btn:hover { color: var(--text); }
+        .speed-btn.active { background: var(--surface); color: var(--accent); box-shadow: 0 1px 3px rgb(0 0 0 / 12%); }
+        #customSpeedBtn { outline: 1px dashed var(--accent); outline-offset: -3px; }
+
+        /* --- Reading --- */
+        #view-content { padding-bottom: 96px; }
+
+        .prose { font-size: 16px; line-height: 1.7; overflow-wrap: anywhere; }
+        .prose > :first-child { margin-top: 0; }
+        .prose h1, .prose h2, .prose h3, .prose h4 { margin: 1.6em 0 0.5em; font-size: 1.12em; line-height: 1.35; }
+        .prose p, .prose ul, .prose ol, .prose blockquote, .prose pre, .prose table { margin: 0 0 1em; }
+        .prose ul, .prose ol { padding-left: 1.4em; }
+        .prose li + li { margin-top: 0.3em; }
+        .prose a { color: var(--accent); }
+        .prose img { display: block; max-width: 100%; height: auto; margin: 16px auto; border-radius: var(--radius-sm); }
+        .prose code { padding: 0.1em 0.35em; border-radius: 5px; background: var(--surface-2); font: 0.88em var(--mono); }
+        .prose pre { overflow-x: auto; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); font-size: 13px; line-height: 1.5; }
+        .prose pre code { padding: 0; background: none; }
+        .prose blockquote { padding: 2px 0 2px 14px; border-left: 3px solid var(--border); color: var(--text-2); }
+        .prose table { display: block; overflow-x: auto; border-collapse: collapse; font-size: 14px; }
+        .prose th, .prose td { padding: 6px 10px; border: 1px solid var(--border); text-align: left; }
 
         .reading-active {
-            background-color: rgba(42, 122, 228, 0.15);
-            border-left: 4px solid var(--accent-color);
-            padding-left: 8px;
             margin-left: -12px;
+            padding-left: 9px;
+            border-left: 3px solid var(--accent);
             border-radius: 4px;
-        }
-
-        /* --- QUIZ STYLES (Merged from quiz.html) --- */
-        #quizContainer h2#quizQuestion {
-            font-size: 1rem;
-            font-weight: 400;
-            /* Fixed: Was 500/Bold */
-            margin-bottom: 5px;
-            color: var(--text-color);
-            line-height: 1.5;
-        }
-
-        #quizInstruction {
-            font-size: 0.9rem;
-            color: var(--subtext-color);
-            margin-bottom: 20px;
-            font-style: italic;
-        }
-
-        #quizProgress {
-            color: var(--accent-color);
-            font-size: 0.9rem;
-            font-weight: 600;
-            margin: -10px 0 14px;
-        }
-
-        .options-list {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            margin-top: 20px;
-        }
-
-        .option-btn {
-            background: var(--opt-bg);
-            border: 1px solid var(--opt-border);
-            color: var(--text-color);
-            padding: 12px 15px;
-            border-radius: 8px;
-            text-align: left;
-            cursor: pointer;
-            transition: all 0.2s;
-            display: flex;
-            flex-direction: column;
-            font-size: 0.95em;
-        }
-
-        .option-btn:hover {
-            border-color: var(--accent-color);
-            background-color: var(--opt-hover-bg);
-        }
-
-        .option-btn.selected {
-            border-color: var(--selected-border);
-            background-color: var(--selected-bg);
-            box-shadow: 0 0 0 1px var(--selected-border);
-        }
-
-        .option-btn.correct {
-            border-left: 5px solid var(--correct-border);
-            background-color: var(--correct-bg);
-        }
-
-        .option-btn.wrong {
-            border-color: var(--wrong-border);
-            background-color: var(--wrong-bg);
-            animation: shake 0.3s;
-        }
-
-        .option-btn.reveal-correct {
-            border-color: var(--correct-border);
-            background-color: var(--correct-bg);
-            box-shadow: 0 0 5px var(--correct-border);
-            animation: pulse-green 1.5s infinite;
-        }
-
-        .opt-main-row {
-            display: flex;
-            align-items: flex-start;
-        }
-
-        .option-index {
-            font-weight: bold;
-            margin-right: 12px;
-            color: var(--accent-color);
-            min-width: 20px;
-        }
-
-        /* Spoilers */
-        .opt-hint-row {
-            margin-top: 8px;
-            padding-top: 8px;
-            border-top: 1px dashed var(--border-color);
-            font-size: 0.85em;
-            width: 100%;
-        }
-
-        .opt-hint-row.active {
-            background-color: var(--hint-bg);
-            margin: -12px -15px -12px -15px;
-            /* Expand to edges */
-            padding: 8px 15px;
-            border-top: 1px solid var(--border-color);
-            border-bottom-left-radius: 8px;
-            border-bottom-right-radius: 8px;
-            margin-top: 8px;
-        }
-
-        .hint-toggle {
-            color: var(--accent-color);
-            cursor: pointer;
-            font-weight: 600;
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .hint-content {
-            margin-top: 8px;
-            color: var(--subtext-color);
-            font-style: italic;
-            border-left: 2px solid var(--accent-color);
-            padding-left: 5px;
-        }
-
-        .hidden {
-            display: none !important;
-        }
-
-        /* --- Actions Footer --- */
-        .reading-actions {
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 1px solid var(--border-color);
-            display: flex;
-            justify-content: space-between;
-        }
-
-        .action-btn {
-            background-color: transparent;
-            color: var(--accent-color);
-            border: 1px solid var(--accent-color);
-            padding: 8px 16px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: 600;
-        }
-
-        .action-btn.primary {
-            background-color: var(--accent-color);
-            color: var(--btn-text);
+            background: var(--accent-soft);
         }
 
         #opinionSection {
-            background-color: rgba(127, 127, 127, 0.05);
-            padding: 15px;
-            border-radius: 6px;
-            margin-top: 30px;
+            margin-top: 28px;
+            padding: 16px 18px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: var(--surface);
         }
 
-        /* FAB */
-        .fab-control {
+        #opinionSection h3 { margin: 0 0 8px; }
+
+        .reading-dock {
             position: fixed;
-            bottom: 20px;
-            right: 20px;
-            width: 56px;
-            height: 56px;
-            border-radius: 50%;
-            background-color: var(--accent-color);
-            color: white;
-            border: none;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
-            cursor: pointer;
-            display: flex;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 80;
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
             align-items: center;
-            justify-content: center;
-            font-size: 24px;
-            z-index: 1000;
-            opacity: 0;
-            pointer-events: none;
-            transition: all 0.3s;
-        }
-
-        .fab-control.visible {
-            opacity: 1;
-            pointer-events: auto;
-        }
-
-        @keyframes shake {
-
-            0%,
-            100% {
-                transform: translateX(0);
-            }
-
-            25%,
-            75% {
-                transform: translateX(-5px);
-            }
-
-            50% {
-                transform: translateX(5px);
-            }
-        }
-
-
-        @keyframes pulse-green {
-            0% {
-                box-shadow: 0 0 0 0 rgba(0, 196, 167, 0.4);
-            }
-
-            70% {
-                box-shadow: 0 0 0 10px rgba(0, 196, 167, 0);
-            }
-
-            100% {
-                box-shadow: 0 0 0 0 rgba(0, 196, 167, 0);
-            }
-        }
-
-        /* --- New Top Controls --- */
-        .reading-actions-top {
-            position: relative;
-            display: flex;
-            justify-content: flex-end;
-            align-items: center;
-            flex-wrap: nowrap;
             gap: 10px;
-            min-height: 34px;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 1px dashed var(--border-color);
+            padding: 12px 16px;
+            background: var(--surface);
+            border-top: 1px solid var(--border);
+            box-shadow: 0 -4px 16px rgb(16 24 40 / 6%);
         }
 
-        .reading-actions-top .action-btn {
-            font-size: 0.9em;
-            padding: 6px 12px;
-        }
-
-        #ttsBtnTop {
-            position: absolute;
-            left: 50%;
-            transform: translateX(-50%);
-            max-width: 120px;
-            padding-inline: 9px;
-            font-size: 0.82rem;
-            white-space: nowrap;
-        }
-
-        #finishBtnTop { white-space: nowrap; }
-
-        /* --- Fix Overlap & Spacing --- */
-        #view-content {
-            padding-top: 30px;
-            /* Give some air from the fixed header */
-            padding-bottom: 80px;
-            /* Ensure bottom content isn't covered by Fab or obscured */
-        }
-
-        div#textContainer {
-            margin-top: 10px;
-        }
+        /* The play button keeps one width so the bar never jumps when its label changes. */
+        #ttsBtnTop { min-width: 124px; }
+        #ttsBtnTop .icon-pause, #ttsBtnTop[data-state="playing"] .icon-play { display: none; }
+        #ttsBtnTop[data-state="playing"] .icon-pause { display: block; }
+        #finishBtnTop { justify-self: end; }
 
         .reading-mode-switch {
+            justify-self: start;
             display: inline-flex;
-            margin-right: auto;
-            padding: 2px;
-            border: 1px solid var(--border-color);
+            padding: 3px;
+            border: 1px solid var(--border);
             border-radius: 999px;
-            background: var(--hint-bg);
+            background: var(--surface-2);
         }
 
         .reading-mode-switch button {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 5px 10px;
             border: 0;
             border-radius: 999px;
-            padding: 5px 9px;
             background: transparent;
-            color: var(--subtext-color);
-            cursor: pointer;
-            font: inherit;
-            font-size: 0.78rem;
+            color: var(--text-2);
+            font-size: 13px;
             font-weight: 600;
+            cursor: pointer;
         }
 
-        .reading-mode-switch button.active {
-            background: var(--accent-color);
-            color: var(--btn-text);
-        }
+        .reading-mode-switch .icon { width: 15px; height: 15px; }
+        .reading-mode-switch button.active { background: var(--surface); color: var(--accent); box-shadow: 0 1px 3px rgb(0 0 0 / 12%); }
 
         #textContainer.rsvp-mode #dynamicContent,
-        #textContainer.rsvp-mode #opinionSection {
-            display: none;
-        }
+        #textContainer.rsvp-mode #opinionSection { display: none; }
 
+        /* --- Speed reading --- */
         #rsvpPanel {
-            padding: 16px;
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            background: var(--hint-bg);
+            padding: 14px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: var(--surface);
+            box-shadow: var(--shadow);
         }
 
         .rsvp-stage {
             position: relative;
-            min-height: 210px;
+            min-height: 220px;
             overflow: hidden;
             border-radius: 10px;
-            background: #111318;
-            color: #f7f7f7;
+            background: var(--stage-bg);
+            color: var(--stage-text);
             cursor: pointer;
-            transition: box-shadow 0.2s ease, transform 0.2s ease;
+            transition: box-shadow 0.2s;
         }
 
-        .rsvp-stage:hover {
-            box-shadow: 0 0 0 2px var(--accent-color), 0 8px 24px rgba(0, 0, 0, 0.22);
-        }
-
-        .rsvp-stage:active { transform: scale(0.995); }
-
-        .rsvp-stage:focus-visible {
-            outline: 3px solid var(--accent-color);
-            outline-offset: 3px;
-        }
+        .rsvp-stage:hover { box-shadow: 0 0 0 2px var(--accent); }
 
         .rsvp-marker {
             position: absolute;
             left: 50%;
             width: 2px;
-            height: 32px;
+            height: 26px;
             transform: translateX(-50%);
-            background: var(--wrong-border);
+            background: color-mix(in srgb, var(--stage-focus) 70%, transparent);
         }
 
         .rsvp-marker.top { top: 0; }
@@ -601,112 +435,120 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font: 600 clamp(2rem, 9vw, 4rem)/1 ui-monospace, SFMono-Regular, Consolas, monospace;
+            font: 600 clamp(2rem, 8.5vw, 3.6rem)/1 var(--mono);
             white-space: nowrap;
         }
 
-        #rsvpBefore {
-            position: absolute;
-            right: calc(50% + 0.5ch);
-            text-align: right;
-        }
+        #rsvpBefore { position: absolute; right: calc(50% + 0.5ch); text-align: right; }
+        #rsvpFocus { position: absolute; left: 50%; transform: translateX(-50%); color: var(--stage-focus); }
+        #rsvpAfter { position: absolute; left: calc(50% + 0.5ch); text-align: left; }
 
-        #rsvpFocus {
-            position: absolute;
-            left: 50%;
-            transform: translateX(-50%);
-            color: #ff5f5f;
-            text-shadow: 0 0 18px rgba(255, 95, 95, 0.55);
-        }
-
-        #rsvpAfter {
-            position: absolute;
-            left: calc(50% + 0.5ch);
-            text-align: left;
-        }
-
-        .rsvp-progress {
-            width: 100%;
-            margin: 16px 0 8px;
-        }
+        .rsvp-progress { width: 100%; margin: 14px 0 6px; accent-color: var(--accent); }
 
         .rsvp-meta {
             display: flex;
             align-items: center;
             justify-content: space-between;
             gap: 12px;
-            color: var(--subtext-color);
-            font-size: 0.82rem;
+            color: var(--text-2);
+            font-size: 13px;
         }
 
-        .rsvp-speed-control {
-            display: inline-flex;
-            align-items: center;
-            gap: 7px;
-            white-space: nowrap;
+        #rsvpStatus { font-variant-numeric: tabular-nums; }
+        .rsvp-speed-control { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+        #rsvpWpmInline { width: 120px; accent-color: var(--accent); }
+        #rsvpPanel .kbd-hint { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+
+        /* --- Quiz --- */
+        .quiz-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+
+        #quizQuestion { margin: 0 0 6px; font-size: 16px; font-weight: 500; line-height: 1.6; }
+        #quizQuestion p { margin: 0 0 0.6em; }
+        #quizInstruction { margin: 0 0 16px; color: var(--text-2); font-size: 14px; }
+        #quizProgress { margin: -8px 0 14px; color: var(--accent); font-size: 14px; font-weight: 600; }
+
+        .options-list { display: grid; gap: 10px; }
+
+        .option-btn {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            width: 100%;
+            padding: 12px 14px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            background: var(--surface);
+            color: var(--text);
+            text-align: left;
+            cursor: pointer;
+            transition: border-color 0.15s, background-color 0.15s;
         }
 
-        #rsvpWpmInline { width: 115px; }
+        .option-btn:hover:not(:disabled) { border-color: var(--accent); }
+        .option-btn:disabled { cursor: default; }
+        .opt-main-row { display: flex; align-items: flex-start; gap: 12px; }
+        .option-text > :first-child { margin-top: 0; }
+        .option-text > :last-child { margin-bottom: 0; }
 
-        @media (max-width: 560px) {
-            .reading-mode-switch button {
-                padding-inline: 7px;
-                font-size: 0.72rem;
-            }
+        .option-index {
+            display: grid;
+            place-items: center;
+            flex: none;
+            width: 26px;
+            height: 26px;
+            margin-top: 1px;
+            border: 1px solid var(--border);
+            border-bottom-width: 2px;
+            border-radius: 6px;
+            background: var(--surface-2);
+            color: var(--text-2);
+            font: 650 12px/1 var(--mono);
         }
+
+        .option-btn.selected { border-color: var(--accent); background: var(--accent-soft); }
+        .option-btn.selected .option-index { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
+        .option-btn.correct, .option-btn.reveal-correct { border-color: var(--success); background: var(--success-soft); }
+        .option-btn.correct .option-index, .option-btn.reveal-correct .option-index { border-color: var(--success); background: var(--success); color: var(--on-accent); }
+        .option-btn.wrong { border-color: var(--danger); background: var(--danger-soft); animation: shake 0.3s; }
+        .option-btn.wrong .option-index { border-color: var(--danger); background: var(--danger); color: var(--on-accent); }
+
+        /* Feedback is spelled out, not only coloured. */
+        .option-btn.correct::after, .option-btn.reveal-correct::after,
+        .option-btn.wrong::after { margin-left: 38px; font-size: 13px; font-weight: 650; }
+        .option-btn.correct::after, .option-btn.reveal-correct::after { content: "✓ Resposta correta"; color: var(--success); }
+        .option-btn.wrong::after { content: "✕ Resposta incorreta"; color: var(--danger); }
+        .option-btn.reading-active { margin-left: 0; padding-left: 14px; border-left: 1px solid var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+
+        #quizNextBtn { margin-top: 16px; }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25%, 75% { transform: translateX(-4px); }
+            50% { transform: translateX(4px); }
+        }
+
+        /* --- History --- */
+        .history-panel {
+            margin-top: 28px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: var(--surface);
+            color: var(--text-2);
+            font-size: 14px;
+        }
+
+        .history-panel summary { padding: 12px 16px; cursor: pointer; font-weight: 600; color: var(--text); }
+        .history-panel ol { margin: 0; padding: 0 16px 14px 36px; }
+        .history-panel li { margin: 5px 0; }
 
         @media (max-width: 460px) {
-            .reading-actions-top {
-                flex-direction: column;
-                align-items: center;
-            }
-            #ttsBtnTop {
-                position: static;
-                transform: none;
-            }
-            #finishBtnTop { margin-inline: auto; }
-            .reading-mode-switch { width: 100%; margin-right: 0; }
-            .reading-mode-switch button { flex: 1; }
-            .rsvp-meta { align-items: stretch; flex-direction: column; }
-            .rsvp-speed-control { justify-content: space-between; }
-            #rsvpWpmInline { flex: 1; }
+            .reading-dock { grid-template-columns: 1fr 1fr; }
+            .reading-mode-switch { grid-column: 1 / -1; justify-self: stretch; }
+            .reading-mode-switch button { flex: 1; justify-content: center; }
+            #ttsBtnTop { justify-self: start; }
+            #view-content { padding-bottom: 140px; }
+            .rsvp-meta { flex-direction: column; align-items: stretch; }
         }
-
-        #quizNextBtn {
-            width: 100%;
-            margin-top: 16px;
-        }
-
-        button:focus-visible, a:focus-visible, summary:focus-visible {
-            outline: 3px solid color-mix(in srgb, var(--accent-color) 45%, transparent);
-            outline-offset: 3px;
-        }
-
-        .advance-banner {
-            position: sticky;
-            top: 61px;
-            z-index: 90;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-            padding: 10px 14px;
-            background: var(--selected-bg);
-            border-bottom: 1px solid var(--selected-border);
-        }
-
-        .advance-banner button { white-space: nowrap; }
-
-        .history-panel {
-            margin-top: 24px;
-            padding: 12px;
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            color: var(--subtext-color);
-        }
-
-        .history-panel ol { padding-left: 22px; }
-        .history-panel li { margin: 6px 0; }
 
         @media (prefers-reduced-motion: reduce) {
             *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
@@ -715,58 +557,72 @@
 </head>
 
 <body>
-    <header class="global-header">
-        <div class="header-left">
-            <div id="connectionLed" class="led-active" title="Conectado à Alura" role="status" aria-label="Conectado à Alura"></div>
-            <h1 id="mainTitle">Carregando...</h1>
+    <svg xmlns="http://www.w3.org/2000/svg" hidden>
+        <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z"/></symbol>
+        <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6" y="4" width="4.5" height="16" rx="1.2"/><rect x="13.5" y="4" width="4.5" height="16" rx="1.2"/></symbol>
+        <symbol id="i-prev" viewBox="0 0 24 24"><path d="M19 20 9 12l10-8z"/><path d="M5 19V5"/></symbol>
+        <symbol id="i-next" viewBox="0 0 24 24"><path d="m5 4 10 8-10 8z"/><path d="M19 5v14"/></symbol>
+        <symbol id="i-voice" viewBox="0 0 24 24"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></symbol>
+        <symbol id="i-zap" viewBox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></symbol>
+        <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></symbol>
+        <symbol id="i-headphones" viewBox="0 0 24 24"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></symbol>
+        <symbol id="i-book" viewBox="0 0 24 24"><path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2z"/><path d="M22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z"/></symbol>
+    </svg>
+
+    <header class="app-bar">
+        <div id="connectionLed" class="led-active" title="Conectado à Alura" role="status" aria-label="Conectado à Alura"></div>
+        <div class="title-block">
+            <span id="lessonKind" class="eyebrow">Alura Flow</span>
+            <h1 id="mainTitle">Carregando…</h1>
         </div>
-        <!-- Right side tools (optional) -->
     </header>
 
     <div id="advanceBanner" class="advance-banner hidden" role="status" aria-live="assertive">
         <span id="advanceMessage">Avançando em breve…</span>
-        <button id="advanceAction" class="action-btn">Cancelar</button>
+        <button id="advanceAction" class="btn small">Cancelar</button>
     </div>
 
-    <!-- TRANSITION MODE: never treated as lesson content by TTS or RSVP -->
-    <section id="view-loading" class="mode-view hidden" aria-live="polite" aria-busy="true">
+    <!-- NO LESSON -->
+    <section id="view-empty" class="mode-view center-view hidden">
+        <div class="badge-icon" aria-hidden="true"><svg class="icon"><use href="#i-book"/></svg></div>
+        <h2>Nenhuma aula aberta</h2>
+        <p>Abra uma aula da Alura no Firefox. O companion acompanha vídeos, textos e quizzes sozinho.</p>
+    </section>
+
+    <!-- TRANSITION: never treated as lesson content by TTS or RSVP -->
+    <section id="view-loading" class="mode-view center-view hidden" aria-live="polite" aria-busy="true">
         <div class="loading-spinner" aria-hidden="true"></div>
         <p id="loadingMessage">Preparando a próxima aula…</p>
     </section>
 
-    <!-- PLAYER MODE -->
-    <section id="view-player" class="mode-view hidden">
-        <div class="video-placeholder">
-            <span class="icon">🎬</span>
-            <span id="videoStatusText" role="status" aria-live="polite">Reproduzindo vídeo...</span>
-        </div>
+    <!-- PLAYER -->
+    <section id="view-player" class="mode-view center-view hidden">
+        <div class="badge-icon" aria-hidden="true"><svg class="icon"><use href="#i-headphones"/></svg></div>
+        <span id="videoStatusText" role="status" aria-live="polite">Reproduzindo vídeo…</span>
         <div class="controls-wrapper">
-            <button id="remotePrev" class="ctrl-btn" title="Anterior" aria-label="Aula anterior">⏮️</button>
-            <button id="remotePlay" class="ctrl-btn" title="Play/Pause" aria-label="Reproduzir ou pausar">⏯️</button>
-            <button id="remoteNext" class="ctrl-btn" title="Próxima" aria-label="Próxima aula">⏭️</button>
+            <button id="remotePrev" class="ctrl-btn" title="Aula anterior" aria-label="Aula anterior"><svg class="icon filled"><use href="#i-prev"/></svg></button>
+            <button id="remotePlay" class="ctrl-btn" data-state="paused" title="Reproduzir ou pausar" aria-label="Reproduzir ou pausar">
+                <svg class="icon filled icon-play"><use href="#i-play"/></svg>
+                <svg class="icon filled icon-pause"><use href="#i-pause"/></svg>
+            </button>
+            <button id="remoteNext" class="ctrl-btn" title="Próxima aula" aria-label="Próxima aula"><svg class="icon filled"><use href="#i-next"/></svg></button>
         </div>
-        <div class="speed-controls">
-            <button class="speed-btn" data-speed="1.0">1x</button>
-            <button class="speed-btn" data-speed="1.25">1.25x</button>
-            <button class="speed-btn" data-speed="1.5">1.5x</button>
-            <button class="speed-btn" data-speed="2.0">2x</button>
-            <button id="customSpeedBtn" class="speed-btn hidden"
-                style="border: 1px dashed var(--accent-color); color: var(--accent-color);">?.?x</button>
+        <div class="speed-block">
+            <span class="eyebrow" id="speedLabel">Velocidade</span>
+            <div class="speed-controls" role="group" aria-labelledby="speedLabel">
+                <button class="speed-btn" data-speed="1.0">1x</button>
+                <button class="speed-btn" data-speed="1.25">1,25x</button>
+                <button class="speed-btn" data-speed="1.5">1,5x</button>
+                <button class="speed-btn" data-speed="2.0">2x</button>
+                <button id="customSpeedBtn" class="speed-btn hidden">?x</button>
+            </div>
         </div>
+        <p class="kbd-hint">Teclas de mídia <kbd>⏮</kbd> <kbd>⏭</kbd> trocam de aula, mesmo em outro programa.</p>
     </section>
 
-    <!-- CONTENT MODE (Text or Quiz) -->
+    <!-- CONTENT (text or quiz) -->
     <section id="view-content" class="mode-view hidden">
-        <!-- Text Content Area -->
         <div id="textContainer">
-            <div class="reading-actions-top">
-                <div class="reading-mode-switch" role="group" aria-label="Modo de leitura">
-                    <button type="button" data-reading-mode="tts" class="active" aria-pressed="true">🔊 TTS</button>
-                    <button type="button" data-reading-mode="rsvp" aria-pressed="false">⚡ Leitura rápida</button>
-                </div>
-                <button id="ttsBtnTop" class="action-btn">🔊 Ouvir</button>
-                <button id="finishBtnTop" class="action-btn primary">Concluir e avançar</button>
-            </div>
             <div id="rsvpPanel" class="hidden">
                 <div id="rsvpStage" class="rsvp-stage" role="button" tabindex="0" aria-pressed="false"
                     aria-label="Iniciar leitura rápida" title="Clique para iniciar a leitura rápida"
@@ -780,26 +636,40 @@
                     <span id="rsvpStatus" role="status">Pronto para iniciar</span>
                     <label class="rsvp-speed-control" for="rsvpWpmInline"><span id="rsvpWpmInlineValue">300 ppm</span><input id="rsvpWpmInline" type="range" min="100" max="800" step="25" value="300"></label>
                 </div>
+                <p class="kbd-hint"><kbd>Espaço</kbd> iniciar ou pausar · <kbd>←</kbd> início da frase · <kbd>→</kbd> próxima frase</p>
             </div>
-            <div id="dynamicContent" class="content-container"></div>
-            <div id="opinionSection" class="hidden">
-                <h3 style="color: var(--accent-color); margin-bottom: 10px;">Opinião do Instrutor</h3>
-                <div id="opinionContent" class="content-container"></div>
+            <article id="dynamicContent" class="prose"></article>
+            <aside id="opinionSection" class="hidden">
+                <h3 class="eyebrow">Opinião do instrutor</h3>
+                <div id="opinionContent" class="prose"></div>
+            </aside>
+            <div id="readingDock" class="reading-dock">
+                <div class="reading-mode-switch" role="group" aria-label="Modo de leitura">
+                    <button type="button" data-reading-mode="tts" class="active" aria-pressed="true"><svg class="icon"><use href="#i-voice"/></svg>Voz</button>
+                    <button type="button" data-reading-mode="rsvp" aria-pressed="false"><svg class="icon"><use href="#i-zap"/></svg>Rápida</button>
+                </div>
+                <button id="ttsBtnTop" class="btn primary" data-state="idle">
+                    <svg class="icon filled icon-play"><use href="#i-play"/></svg>
+                    <svg class="icon filled icon-pause"><use href="#i-pause"/></svg>
+                    <span class="label">Ouvir</span>
+                </button>
+                <button id="finishBtnTop" class="btn" title="Concluir e avançar para a próxima aula">Concluir<svg class="icon"><use href="#i-arrow"/></svg></button>
             </div>
         </div>
 
-        <!-- Quiz Content Area -->
         <div id="quizContainer" class="hidden">
-            <h2 id="quizQuestion">Loading...</h2>
+            <div class="quiz-header">
+                <span class="eyebrow">Questão</span>
+                <button id="quizListenBtn" class="btn small ghost" data-state="idle">
+                    <svg class="icon"><use href="#i-voice"/></svg><span class="label">Ouvir pergunta</span>
+                </button>
+            </div>
+            <h2 id="quizQuestion">Carregando…</h2>
             <p id="quizInstruction" class="hidden"></p>
             <p id="quizProgress" class="hidden" role="status" aria-live="polite"></p>
             <div id="quizOptions" class="options-list"></div>
-            <button id="quizNextBtn" class="action-btn primary hidden">Avançar para a próxima lição</button>
-        </div>
-
-        <div class="reading-actions">
-            <button id="ttsBtn" class="action-btn">🔊 Ouvir</button>
-            <button id="finishBtn" class="action-btn primary">Concluir e avançar</button>
+            <button id="quizNextBtn" class="btn primary block hidden">Avançar para a próxima lição<svg class="icon"><use href="#i-arrow"/></svg></button>
+            <p id="quizKeysHint" class="kbd-hint"><kbd>1</kbd>–<kbd data-last-digit>4</kbd> ou <kbd>A</kbd>–<kbd data-last-letter>D</kbd> escolhem · <kbd>Espaço</kbd> ouvir · <kbd>Enter</kbd> avançar após acertar</p>
         </div>
 
         <details id="historyPanel" class="history-panel">
@@ -807,8 +677,6 @@
             <ol id="historyList"></ol>
         </details>
     </section>
-
-    <button id="ttsFab" class="fab-control" aria-label="Pausar ou retomar leitura">⏯️</button>
 
     <script src="core.js"></script>
     <script src="reading.js"></script>

@@ -3,13 +3,13 @@
 document.addEventListener('DOMContentLoaded', () => {
     const byId = id => document.getElementById(id);
     const ui = {
-        led: byId('connectionLed'), title: byId('mainTitle'), loading: byId('view-loading'), loadingMessage: byId('loadingMessage'),
-        player: byId('view-player'), content: byId('view-content'),
+        led: byId('connectionLed'), kind: byId('lessonKind'), title: byId('mainTitle'), empty: byId('view-empty'),
+        loading: byId('view-loading'), loadingMessage: byId('loadingMessage'), player: byId('view-player'), content: byId('view-content'),
         text: byId('textContainer'), quiz: byId('quizContainer'), quizProgress: byId('quizProgress'), dynamic: byId('dynamicContent'), opinion: byId('opinionSection'),
         opinionContent: byId('opinionContent'), videoStatus: byId('videoStatusText'), play: byId('remotePlay'), prev: byId('remotePrev'),
-        next: byId('remoteNext'), tts: byId('ttsBtn'), ttsTop: byId('ttsBtnTop'), finish: byId('finishBtn'),
-        finishTop: byId('finishBtnTop'), fab: byId('ttsFab'), banner: byId('advanceBanner'), bannerMessage: byId('advanceMessage'),
-        bannerAction: byId('advanceAction'), quizNext: byId('quizNextBtn'), history: byId('historyList'),
+        next: byId('remoteNext'), ttsTop: byId('ttsBtnTop'), finishTop: byId('finishBtnTop'),
+        banner: byId('advanceBanner'), bannerMessage: byId('advanceMessage'), bannerAction: byId('advanceAction'),
+        quizNext: byId('quizNextBtn'), quizListen: byId('quizListenBtn'), quizKeysHint: byId('quizKeysHint'), history: byId('historyList'),
         rsvpPanel: byId('rsvpPanel'), rsvpStage: byId('rsvpStage'), rsvpBefore: byId('rsvpBefore'), rsvpFocus: byId('rsvpFocus'), rsvpAfter: byId('rsvpAfter'),
         rsvpProgress: byId('rsvpProgress'), rsvpStatus: byId('rsvpStatus'), rsvpWpm: byId('rsvpWpmInline'), rsvpWpmValue: byId('rsvpWpmInlineValue')
     };
@@ -38,6 +38,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let lastClickedOptionId = null;
     let bannerMode = 'cancel';
     let undoTimer = null;
+    let renderedQuizKey = '';
+    let renderedQuizSignature = '';
 
     function runtimeMessage(message) {
         return new Promise(resolve => chrome.runtime.sendMessage(message, response => resolve(response || {})));
@@ -50,6 +52,37 @@ document.addEventListener('DOMContentLoaded', () => {
             runtimeMessage({ type: 'CYCLE_SPEED_REQUEST' });
         }
     }, true);
+
+    function companionView() {
+        if (currentMode !== 'CONTENT' || AluraFlowCore.isLoadingState(currentData)) return null;
+        return currentData?.isQuiz ? 'quiz' : 'text';
+    }
+
+    // Keyboard-first companion: Space plays or pauses, arrows move by sentence in
+    // speed reading, and quiz options are chosen by number or letter.
+    document.addEventListener('keydown', event => {
+        if (event.defaultPrevented || event.ctrlKey || event.altKey || event.metaKey) return;
+        const target = event.target;
+        if (target?.closest?.('input, select, textarea, [contenteditable]')) return;
+        // Space and Enter keep activating whichever button has focus.
+        if ((event.key === ' ' || event.key === 'Enter') && target?.closest?.('button, a[href], summary, [role="button"]')) return;
+        const action = AluraFlowCore.companionKeyAction(event.key, {
+            view: companionView(),
+            readingMode,
+            optionCount: byId('quizOptions').children.length,
+            quizSolved: !ui.quizNext.classList.contains('hidden') && !ui.quizNext.disabled
+        });
+        if (!action) return;
+        event.preventDefault();
+        const repeatable = action.type === 'previous-sentence' || action.type === 'next-sentence';
+        if (event.repeat && !repeatable) return;
+        if (action.type === 'toggle-reading') toggleCurrentReading();
+        else if (action.type === 'toggle-speech') toggleQuizSpeech();
+        else if (action.type === 'previous-sentence') seekRsvp(AluraFlowCore.rsvpPreviousSentenceIndex(rsvpWords, rsvpIndex));
+        else if (action.type === 'next-sentence') seekRsvp(AluraFlowCore.rsvpNextSentenceIndex(rsvpWords, rsvpIndex));
+        else if (action.type === 'select-option') byId('quizOptions').children[action.index]?.click();
+        else if (action.type === 'next-lesson') ui.quizNext.click();
+    });
 
     function safeHTML(element, html) {
         if (!element) return;
@@ -114,24 +147,34 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 350);
     }
 
+    function setButtonState(button, state, label) {
+        if (!button) return;
+        button.dataset.state = state;
+        const labelElement = button.querySelector('.label');
+        if (labelElement) labelElement.textContent = label;
+        button.setAttribute('aria-label', label);
+    }
+
     function updateReadingControls() {
-        const rsvpActive = readingMode === 'rsvp' && (rsvpPlaying || rsvpPaused);
-        const ttsActive = readingMode === 'tts' && isSpeaking;
-        const active = rsvpActive || ttsActive;
-        const paused = readingMode === 'rsvp' ? rsvpPaused : isPaused;
-        let label = '▶ Ouvir';
-        if (readingMode === 'rsvp') label = rsvpPlaying ? '⏸ Pausar' : rsvpPaused ? '▶ Retomar' : '▶ Iniciar';
-        else if (isSpeaking) label = isPaused ? '▶ Retomar' : '⏸ Pausar';
-        [ui.tts, ui.ttsTop].forEach(button => { if (button) button.textContent = label; });
+        // Quizzes are always read by voice, whatever the lesson reading mode is.
+        const usingRsvp = readingMode === 'rsvp' && currentData?.isQuiz !== true;
+        let state = 'idle';
+        let label = 'Ouvir';
+        if (usingRsvp) {
+            state = rsvpPlaying ? 'playing' : rsvpPaused ? 'paused' : 'idle';
+            label = rsvpPlaying ? 'Pausar' : rsvpPaused ? 'Retomar' : 'Iniciar';
+        } else if (isSpeaking) {
+            state = isPaused ? 'paused' : 'playing';
+            label = isPaused ? 'Retomar' : 'Pausar';
+        }
+        setButtonState(ui.ttsTop, state, label);
+        setButtonState(ui.quizListen, isSpeaking ? state : 'idle', isSpeaking ? label : 'Ouvir pergunta');
         if (ui.rsvpStage) {
             const stageAction = rsvpPlaying ? 'Pausar leitura rápida' : rsvpPaused ? 'Retomar leitura rápida' : rsvpFinished ? 'Reiniciar leitura rápida' : 'Iniciar leitura rápida';
             ui.rsvpStage.setAttribute('aria-label', stageAction);
             ui.rsvpStage.setAttribute('aria-pressed', String(rsvpPlaying));
             ui.rsvpStage.title = `${stageAction} (clique, Enter ou Espaço)`;
         }
-        ui.fab.classList.toggle('visible', active);
-        ui.fab.textContent = paused ? '▶️' : '⏸️';
-        ui.fab.setAttribute('aria-label', paused ? 'Retomar leitura' : 'Pausar leitura');
         document.querySelectorAll('[data-reading-mode]').forEach(button => {
             const selected = button.dataset.readingMode === readingMode;
             button.classList.toggle('active', selected);
@@ -163,9 +206,19 @@ document.addEventListener('DOMContentLoaded', () => {
         ui.rsvpAfter.textContent = parts.after;
         const progress = rsvpWords.length ? ((rsvpIndex + 1) / rsvpWords.length) * 100 : 0;
         ui.rsvpProgress.value = String(progress);
+        const position = Math.min(rsvpIndex + 1, rsvpWords.length);
         ui.rsvpStatus.textContent = rsvpWords.length
-            ? `${Math.min(rsvpIndex + 1, rsvpWords.length)} de ${rsvpWords.length} palavras`
+            ? `${position} de ${rsvpWords.length} palavras · ${AluraFlowCore.rsvpTimeLeftLabel(rsvpWords.length - position, rsvpWpm)}`
             : 'Nenhum texto disponível';
+    }
+
+    function seekRsvp(index) {
+        if (!rsvpWords.length) prepareRsvpWords(false);
+        if (!rsvpWords.length) return;
+        rsvpIndex = Math.min(rsvpWords.length - 1, Math.max(0, index));
+        rsvpFinished = false;
+        renderRsvpWord();
+        if (rsvpPlaying) scheduleRsvpWord();
     }
 
     function prepareRsvpWords(resetPosition = false) {
@@ -312,6 +365,7 @@ document.addEventListener('DOMContentLoaded', () => {
         rsvpWpm = Math.min(800, Math.max(100, Number(value) || 300));
         ui.rsvpWpm.value = String(rsvpWpm);
         ui.rsvpWpmValue.textContent = `${rsvpWpm} ppm`;
+        if (rsvpWords.length) renderRsvpWord();
         if (rsvpPlaying) scheduleRsvpWord();
     }
 
@@ -336,21 +390,51 @@ document.addEventListener('DOMContentLoaded', () => {
         const speechKey = readingRunKey('tts');
         if (options.expectedKey && options.expectedKey !== speechKey) return;
         if (options.automatic && autoReadCompletedKey === speechKey) return;
+        const elements = readableElements(ui.dynamic).concat(ui.opinion.classList.contains('hidden') ? [] : readableElements(ui.opinionContent));
+        speakElements(elements, {
+            canContinue: () => currentMode === 'CONTENT' && AluraFlowCore.canReadLesson(currentData),
+            onComplete: settings => completeTextReading(speechKey, settings.autoAdvanceEnabled)
+        });
+    }
+
+    function canReadQuiz() {
+        return currentMode === 'CONTENT' && currentData?.isQuiz === true && !AluraFlowCore.isLoadingState(currentData);
+    }
+
+    function quizSpeechText(element) {
+        if (!element.classList.contains('option-btn')) return element.innerText.trim();
+        return `Alternativa ${element.dataset.letter}. ${element.querySelector('.option-text')?.innerText.trim() || ''}`;
+    }
+
+    function startQuizSpeech() {
+        if (!canReadQuiz()) return;
+        const options = Array.from(byId('quizOptions').querySelectorAll('.option-btn'));
+        const elements = [byId('quizQuestion'), byId('quizInstruction'), ...options]
+            .filter(element => !element.classList.contains('hidden') && element.innerText.trim());
+        speakElements(elements, { textOf: quizSpeechText, canContinue: canReadQuiz });
+    }
+
+    function toggleQuizSpeech() {
+        if (!isSpeaking) startQuizSpeech();
+        else togglePause();
+    }
+
+    // Speaks each element in turn, highlighting it while it is read.
+    function speakElements(elements, { textOf = element => element.innerText.trim(), canContinue, onComplete }) {
         stopRsvp(false);
         stopSpeaking();
         const generation = speechGeneration;
-        const elements = readableElements(ui.dynamic).concat(ui.opinion.classList.contains('hidden') ? [] : readableElements(ui.opinionContent));
         if (!elements.length) return;
 
         chrome.storage.local.get(['ttsRate', 'ttsVoiceURI', 'autoAdvanceEnabled'], settings => {
-            if (generation !== speechGeneration || currentMode !== 'CONTENT' || !AluraFlowCore.canReadLesson(currentData)) return;
+            if (generation !== speechGeneration || !canContinue()) return;
             const voice = bestVoice(synth.getVoices(), settings.ttsVoiceURI || '', currentData.language || 'pt-BR');
             let completed = 0;
             isSpeaking = true;
             updateReadingControls();
 
             elements.forEach(element => {
-                const utterance = new SpeechSynthesisUtterance(element.innerText.trim());
+                const utterance = new SpeechSynthesisUtterance(textOf(element));
                 let settled = false;
                 utterance.lang = currentData.language || 'pt-BR';
                 utterance.rate = Number(settings.ttsRate) || 1.15;
@@ -371,7 +455,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     isSpeaking = false;
                     isPaused = false;
                     updateReadingControls();
-                    completeTextReading(speechKey, settings.autoAdvanceEnabled);
+                    onComplete?.(settings);
                 };
                 utterance.onend = settleUtterance;
                 utterance.onerror = settleUtterance;
@@ -393,13 +477,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function toggleCurrentReading() {
-        if (readingMode === 'rsvp') toggleRsvp();
+        if (currentData?.isQuiz) toggleQuizSpeech();
+        else if (readingMode === 'rsvp') toggleRsvp();
         else toggleSpeech();
-    }
-
-    function toggleCurrentPause() {
-        if (readingMode === 'rsvp') toggleRsvp();
-        else togglePause();
     }
 
     function viewKey(data) {
@@ -472,7 +552,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const custom = byId('customSpeedBtn');
         custom.classList.toggle('hidden', matched);
         custom.classList.toggle('active', !matched);
-        if (!matched) { custom.dataset.speed = speed; custom.textContent = `${Number(speed).toFixed(2).replace(/0+$/, '').replace(/\.$/, '')}x`; }
+        if (!matched) { custom.dataset.speed = speed; custom.textContent = `${Number(speed).toFixed(2).replace(/0+$/, '').replace(/\.$/, '').replace('.', ',')}x`; }
+    }
+
+    function refreshSpeedUI(courseId) {
+        chrome.storage.local.get(['playbackSpeed', 'perCourseSettings', 'courseProfiles'], settings => {
+            setSpeedUI(AluraFlowCore.effectivePlaybackSpeed(settings, courseId));
+        });
     }
 
     function renderText(data) {
@@ -481,11 +567,11 @@ document.addEventListener('DOMContentLoaded', () => {
             renderLoading(data);
             return;
         }
+        forgetRenderedQuiz();
         ui.text.classList.remove('hidden');
         ui.quiz.classList.add('hidden');
-        ui.finish.closest('.reading-actions').classList.toggle('hidden', isLoading);
-        [ui.tts, ui.ttsTop, ui.finish, ui.finishTop].forEach(button => button?.classList.toggle('hidden', isLoading));
-        ui.title.textContent = data.displayTitle || data.title || 'Leitura';
+        // The header label already says "Transcrição do vídeo".
+        ui.title.textContent = (data.isVideoTranscript ? data.title : data.displayTitle || data.title) || 'Leitura';
         safeHTML(ui.dynamic, data.html || '');
         if (data.opinionHtml) { safeHTML(ui.opinionContent, data.opinionHtml); ui.opinion.classList.remove('hidden'); }
         else { ui.opinion.classList.add('hidden'); ui.opinionContent.replaceChildren(); }
@@ -519,12 +605,27 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function forgetRenderedQuiz() {
+        renderedQuizKey = '';
+        renderedQuizSignature = '';
+    }
+
+    function quizSignature(data) {
+        return JSON.stringify([currentViewKey, data.isSolved, (data.options || []).map(option => [option.id, option.isSelected, option.isCorrect, option.isIncorrect])]);
+    }
+
     function renderQuiz(data) {
+        // The page re-reports the same quiz now and then; re-rendering it would cut
+        // the question off mid-sentence and drop the answer just clicked.
+        const signature = quizSignature(data);
+        if (signature === renderedQuizSignature) return;
+        const isNewQuiz = renderedQuizKey !== currentViewKey;
+        renderedQuizKey = currentViewKey;
+        renderedQuizSignature = signature;
         stopAllReading();
         ui.text.classList.add('hidden');
         ui.quiz.classList.remove('hidden');
-        ui.finish.closest('.reading-actions').classList.add('hidden');
-        [ui.tts, ui.ttsTop, ui.finish, ui.finishTop].forEach(button => button?.classList.add('hidden'));
+        if (isNewQuiz) ui.quizNext.disabled = false;
         ui.title.textContent = data.title || 'Quiz';
         safeHTML(byId('quizQuestion'), data.questionHTML || 'Pergunta');
         const instruction = byId('quizInstruction');
@@ -557,7 +658,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const letter = document.createElement('span');
             letter.className = 'option-index';
             letter.textContent = String.fromCharCode(65 + index);
+            letter.setAttribute('aria-hidden', 'true');
+            button.dataset.letter = letter.textContent;
             const content = document.createElement('span');
+            content.className = 'option-text';
             safeHTML(content, option.html);
             row.append(letter, content);
             button.append(row);
@@ -571,8 +675,26 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             options.append(button);
         });
+        const optionCount = (data.options || []).length;
+        ui.quizKeysHint.querySelector('[data-last-digit]').textContent = String(Math.min(9, optionCount));
+        ui.quizKeysHint.querySelector('[data-last-letter]').textContent = String.fromCharCode(64 + Math.max(1, optionCount));
         recordLesson(data);
         if (data.isSolved) markLessonCompleted();
+        else if (isNewQuiz) scheduleQuizAutoRead();
+    }
+
+    // Reads a new, unanswered quiz aloud when automatic reading is on in voice mode.
+    function scheduleQuizAutoRead() {
+        const scheduledKey = readingRunKey('quiz');
+        chrome.storage.local.get(['autoReadEnabled', 'readingMode'], settings => {
+            if (settings.autoReadEnabled === false || (settings.readingMode || 'tts') !== 'tts') return;
+            if (autoReadAttemptedKey === scheduledKey) return;
+            autoReadAttemptedKey = scheduledKey;
+            clearTimeout(autoReadTimer);
+            autoReadTimer = setTimeout(() => {
+                if (readingRunKey('quiz') === scheduledKey && !isSpeaking) startQuizSpeech();
+            }, 500);
+        });
     }
 
     function completeQuiz(correctIds = []) {
@@ -593,28 +715,49 @@ document.addEventListener('DOMContentLoaded', () => {
         rsvpFinished = false;
         rsvpLessonKey = '';
         renderRsvpWord();
+        forgetRenderedQuiz();
+        ui.empty.classList.add('hidden');
         ui.player.classList.add('hidden');
         ui.content.classList.add('hidden');
         ui.loading.classList.remove('hidden');
         ui.title.textContent = data.displayTitle || data.title || 'Preparando a próxima aula…';
-        ui.loadingMessage.textContent = 'Aguarde enquanto a próxima aula é preparada.';
+        ui.loadingMessage.textContent = data.loadingReason === 'video-transcription'
+            ? 'Carregando a transcrição do vídeo…'
+            : 'Aguarde enquanto a próxima aula é preparada.';
+    }
+
+    function lessonKindLabel(mode, data) {
+        // The loading title already says what is happening.
+        if (!mode || mode === 'NONE' || AluraFlowCore.isLoadingState(data)) return 'Alura Flow';
+        if (mode === 'PLAYER') return 'Vídeo';
+        if (data?.isQuiz) return 'Quiz';
+        return data?.isVideoTranscript ? 'Transcrição do vídeo' : 'Leitura';
+    }
+
+    function setPlayerState(status) {
+        ui.videoStatus.textContent = status === 'playing' ? 'Reproduzindo…' : status === 'loading' ? 'Carregando vídeo…' : 'Pausado';
+        ui.play.dataset.state = status === 'playing' ? 'playing' : 'paused';
+        ui.play.setAttribute('aria-label', status === 'playing' ? 'Pausar vídeo' : 'Reproduzir vídeo');
     }
 
     function switchMode(mode, data) {
+        ui.kind.textContent = lessonKindLabel(mode, data);
         if (!mode || mode === 'NONE') {
-            ui.title.textContent = 'Abra uma aula da Alura';
+            ui.title.textContent = 'Aguardando uma aula';
             ui.led.classList.remove('led-active');
             ui.loading.classList.add('hidden');
             ui.player.classList.add('hidden');
             ui.content.classList.add('hidden');
+            ui.empty.classList.remove('hidden');
             return;
         }
         const key = viewKey(data);
         const changed = key !== currentViewKey;
         const modeChanged = mode !== currentMode;
-        if (changed || modeChanged || data?.isQuiz) stopAllReading();
+        if (changed || modeChanged) stopAllReading();
         currentData = data || {};
         currentViewKey = key;
+        ui.empty.classList.add('hidden');
         ui.led.classList.add('led-active');
         if (bannerMode === 'selector-diagnostic') {
             ui.banner.classList.add('hidden');
@@ -628,10 +771,12 @@ document.addEventListener('DOMContentLoaded', () => {
         currentMode = mode;
         ui.loading.classList.add('hidden');
         if (mode === 'PLAYER') {
+            forgetRenderedQuiz();
             ui.player.classList.remove('hidden');
             ui.content.classList.add('hidden');
             ui.title.textContent = data?.title || 'Vídeo';
-            ui.videoStatus.textContent = data?.status === 'playing' ? 'Reproduzindo…' : data?.status === 'loading' ? 'Carregando vídeo…' : 'Pausado';
+            setPlayerState(data?.status);
+            refreshSpeedUI(data?.courseId);
             recordLesson(data, 'video');
         } else if (mode === 'CONTENT') {
             ui.player.classList.add('hidden');
@@ -669,8 +814,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const speed = Number(button.dataset.speed);
         if (Number.isFinite(speed)) runtimeMessage({ type: 'UPDATE_SPEED', speed });
     }));
-    [ui.tts, ui.ttsTop].forEach(button => button?.addEventListener('click', toggleCurrentReading));
-    ui.fab.addEventListener('click', toggleCurrentPause);
+    ui.ttsTop.addEventListener('click', toggleCurrentReading);
+    ui.quizListen.addEventListener('click', toggleQuizSpeech);
     document.querySelectorAll('[data-reading-mode]').forEach(button => button.addEventListener('click', () => setReadingMode(button.dataset.readingMode)));
     ui.rsvpStage.addEventListener('click', toggleRsvp);
     ui.rsvpStage.addEventListener('keydown', event => {
@@ -684,20 +829,17 @@ document.addEventListener('DOMContentLoaded', () => {
     chrome.windows?.onFocusChanged?.addListener(scheduleAutomaticRsvpAttentionCheck);
     ui.rsvpProgress.addEventListener('input', () => {
         if (!rsvpWords.length) return;
-        rsvpIndex = Math.min(rsvpWords.length - 1, Math.max(0, Math.round((Number(ui.rsvpProgress.value) / 100) * (rsvpWords.length - 1))));
-        rsvpFinished = false;
-        renderRsvpWord();
-        if (rsvpPlaying) scheduleRsvpWord();
+        seekRsvp(Math.round((Number(ui.rsvpProgress.value) / 100) * (rsvpWords.length - 1)));
     });
     ui.rsvpWpm.addEventListener('input', () => setRsvpWpm(ui.rsvpWpm.value));
     ui.rsvpWpm.addEventListener('change', () => chrome.storage.local.set({
         [currentData?.isVideoTranscript ? 'transcriptRsvpWpm' : 'rsvpWpm']: rsvpWpm
     }));
-    [ui.finish, ui.finishTop].forEach(button => button?.addEventListener('click', () => {
+    ui.finishTop.addEventListener('click', () => {
         stopAllReading();
         markLessonCompleted();
         runtimeMessage({ type: 'FINISH_READING' });
-    }));
+    });
     ui.quizNext.addEventListener('click', () => {
         ui.quizNext.disabled = true;
         ui.banner.classList.add('hidden');
@@ -721,8 +863,7 @@ document.addEventListener('DOMContentLoaded', () => {
     chrome.runtime.onMessage.addListener(message => {
         if (message.type === 'UPDATE_STATE') switchMode(message.mode, message.data);
         else if (message.type === 'VIDEO_STATE_CHANGED' && currentMode === 'PLAYER') {
-            ui.videoStatus.textContent = message.status === 'playing' ? 'Reproduzindo…' : 'Pausado';
-            ui.play.textContent = message.status === 'playing' ? '⏸️' : '▶️';
+            setPlayerState(message.status);
         } else if (message.type === 'SPEED_UPDATED') setSpeedUI(message.speed);
         else if (message.type === 'COMMAND_PLAY_PAUSE' && currentMode === 'CONTENT') {
             toggleCurrentReading();
@@ -759,10 +900,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    chrome.storage.local.get(['progressHistory', 'playbackSpeed'], result => {
-        renderHistory(result.progressHistory || []);
-        setSpeedUI(result.playbackSpeed || 1);
-    });
+    chrome.storage.local.get(['progressHistory'], result => renderHistory(result.progressHistory || []));
+    refreshSpeedUI(null);
     chrome.storage.onChanged.addListener((changes, area) => {
         if (area === 'local' && changes.autoReadEnabled?.newValue === false) {
             clearTimeout(autoReadTimer);

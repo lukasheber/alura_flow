@@ -1,0 +1,4 @@
+node_modules/
+web-ext-artifacts/
+tests/live/output/
+tests/preview/output/

@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const byId = id => document.getElementById(id);
     const controls = {
         speed: byId('speedSlider'), speedValue: byId('speedValue'), speedLabel: byId('speedLabel'), speedScopeHint: byId('speedScopeHint'),
+        speedChips: Array.from(document.querySelectorAll('[data-speed-preset]')),
         perCourse: byId('perCourseToggle'), autoPlay: byId('autoPlayToggle'), autoAdvance: byId('autoAdvanceToggle'),
         autoAdvanceOptions: byId('autoAdvanceOptions'), advanceDelay: byId('advanceDelay'), minimize: byId('minimizeToggle'),
         transcriptAfterVideo: byId('transcriptAfterVideoToggle'), transcriptOptions: byId('transcriptOptions'),
@@ -11,7 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
         autoRead: byId('autoReadToggle'), readingModes: Array.from(document.querySelectorAll('input[name="readingMode"]')),
         ttsOptions: byId('ttsOptions'), rsvpOptions: byId('rsvpOptions'), rsvpWpm: byId('rsvpWpm'), rsvpWpmValue: byId('rsvpWpmValue'),
         ttsRate: byId('ttsRate'), ttsRateValue: byId('ttsRateValue'), voice: byId('voiceSelect'),
-        shortcuts: byId('shortcutsToggle'), shortcutDetails: byId('shortcutDetails'), shortcutStatus: byId('shortcutStatus'), repairShortcut: byId('repairSpeedShortcut'),
+        mediaKeys: byId('mediaKeysToggle'), shortcuts: byId('shortcutsToggle'), shortcutDetails: byId('shortcutDetails'), shortcutStatus: byId('shortcutStatus'), repairShortcut: byId('repairSpeedShortcut'),
         tabs: byId('controlledTab'), status: byId('sessionStatus'), progress: byId('progressSummary'),
         clearHistory: byId('clearHistory'), clearHistoryHint: byId('clearHistoryHint'), saveStatus: byId('saveStatus')
     };
@@ -45,11 +46,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function formatRate(value) {
-        return Number(value).toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+        return Number(value).toFixed(2).replace(/0+$/, '').replace(/\.$/, '').replace('.', ',');
     }
 
     function updateOutputs() {
-        controls.speedValue.textContent = `${formatRate(controls.speed.value)}x`;
+        const speed = Number(controls.speed.value);
+        controls.speedValue.textContent = `${formatRate(speed)}x`;
+        controls.speedChips.forEach(chip => {
+            const active = Math.abs(Number(chip.dataset.speedPreset) - speed) < 0.01;
+            chip.classList.toggle('active', active);
+            chip.setAttribute('aria-pressed', String(active));
+        });
         controls.ttsRateValue.textContent = `${formatRate(controls.ttsRate.value)}x`;
         controls.rsvpWpmValue.textContent = `${Number(controls.rsvpWpm.value)} ppm`;
         controls.transcriptRsvpWpmValue.textContent = `${Number(controls.transcriptRsvpWpm.value)} ppm`;
@@ -151,7 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         const diagnostic = session.diagnostic;
         if (diagnostic?.data?.message) setStatus(diagnostic.data.message, true);
-        else setStatus(session.latestState?.data?.title ? `Controlando: ${session.latestState.data.title}` : 'Aba selecionada. Aguardando uma aula…');
+        else setStatus(session.latestState?.data?.title || 'Aba selecionada. Aguardando uma aula…');
 
         const courseProfile = settings.courseProfiles?.[currentCourseId()];
         controls.speed.value = controls.perCourse.checked && courseProfile?.playbackSpeed
@@ -159,6 +166,19 @@ document.addEventListener('DOMContentLoaded', () => {
             : settings.playbackSpeed || 1;
         updateSpeedScope();
         updateOutputs();
+    }
+
+    // Remembers which settings groups were left open; a per-viewer convenience only.
+    function restoreOpenSections() {
+        const key = 'aluraFlow.openSections';
+        const sections = Array.from(document.querySelectorAll('details[data-section]'));
+        let open = null;
+        try { open = JSON.parse(localStorage.getItem(key)); } catch (_) { /* storage unavailable */ }
+        if (Array.isArray(open)) sections.forEach(section => { section.open = open.includes(section.dataset.section); });
+        sections.forEach(section => section.addEventListener('toggle', () => {
+            const current = sections.filter(item => item.open).map(item => item.dataset.section);
+            try { localStorage.setItem(key, JSON.stringify(current)); } catch (_) { /* not remembered */ }
+        }));
     }
 
     function populateVoices() {
@@ -188,7 +208,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     chrome.storage.local.get([
-        'playbackSpeed', 'autoPlayEnabled', 'autoAdvanceEnabled', 'autoAdvanceDelay', 'shortcutsEnabled', 'autoReadEnabled',
+        'playbackSpeed', 'autoPlayEnabled', 'autoAdvanceEnabled', 'autoAdvanceDelay', 'shortcutsEnabled', 'mediaKeysEnabled', 'autoReadEnabled',
         'autoMinimizeEnabled', 'ttsRate', 'ttsVoiceURI', 'readingMode', 'rsvpWpm', 'transcriptRsvpWpm',
         'rsvpAfterVideoEnabled', 'perCourseSettings', 'courseProfiles', 'progressHistory'
     ], stored => {
@@ -198,6 +218,7 @@ document.addEventListener('DOMContentLoaded', () => {
         controls.autoAdvance.checked = stored.autoAdvanceEnabled !== false;
         controls.advanceDelay.value = String(stored.autoAdvanceDelay ?? 5);
         controls.shortcuts.checked = stored.shortcutsEnabled !== false;
+        controls.mediaKeys.checked = stored.mediaKeysEnabled !== false;
         controls.autoRead.checked = stored.autoReadEnabled !== false;
         controls.minimize.checked = stored.autoMinimizeEnabled !== false;
         controls.ttsRate.value = stored.ttsRate || 1.15;
@@ -214,7 +235,12 @@ document.addEventListener('DOMContentLoaded', () => {
         loadShortcutStatus();
     });
     speechSynthesis.addEventListener?.('voiceschanged', populateVoices);
+    restoreOpenSections();
 
+    controls.speedChips.forEach(chip => chip.addEventListener('click', () => {
+        controls.speed.value = chip.dataset.speedPreset;
+        saveSpeed();
+    }));
     controls.speed.addEventListener('input', updateOutputs);
     controls.speed.addEventListener('change', saveSpeed);
     controls.ttsRate.addEventListener('input', updateOutputs);
@@ -256,6 +282,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateConditionalSettings();
         saveSettings({ shortcutsEnabled: controls.shortcuts.checked });
     });
+    controls.mediaKeys.addEventListener('change', () => saveSettings({ mediaKeysEnabled: controls.mediaKeys.checked }));
     controls.autoRead.addEventListener('change', () => saveSettings({ autoReadEnabled: controls.autoRead.checked }));
     controls.minimize.addEventListener('change', () => saveSettings({ autoMinimizeEnabled: controls.minimize.checked }));
     controls.transcriptAfterVideo.addEventListener('change', () => {
