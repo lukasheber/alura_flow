@@ -56,15 +56,6 @@ test('quiz instructions determine multiple selection and required count', () => 
     assert.deepEqual(core.quizSelectionRules('Selecione uma alternativa:'), { isMultiple: false, requiredChoices: 0 });
 });
 
-test('current multi-choice markup exposes individual option feedback', async () => {
-    const fixture = await readFile(new URL('./fixtures/new-multiple-quiz.html', import.meta.url), 'utf8');
-    const instruction = fixture.match(/Selecione\s+\d+\s+alternativas:/i)?.[0];
-    const rules = core.quizSelectionRules(instruction);
-    assert.deepEqual(rules, { isMultiple: true, requiredChoices: 2 });
-    assert.match(fixture, /aria-label="Resposta correta"/);
-    assert.match(fixture, /aria-label="Resposta incorreta"/);
-});
-
 test('controlled tab wins, otherwise the most recent active tab wins', () => {
     const tabs = [
         { id: 1, active: true, lastAccessed: 10 },
@@ -81,6 +72,30 @@ test('course and lesson IDs are stable across same-title lessons', () => {
     assert.equal(core.courseIdFromUrl(first), 'javascript');
     assert.equal(core.lessonIdFromUrl(first), '101');
     assert.equal(core.lessonIdFromUrl(second), '102');
+});
+
+test('the /classpage/ lesson URLs keep the same course ID as /course/ URLs', () => {
+    const classpage = 'https://empresa.alura.com.br/classpage/educacao-financeira/task/201579';
+    assert.equal(core.courseIdFromUrl(classpage), 'educacao-financeira');
+    assert.equal(core.courseIdFromUrl('https://empresa.alura.com.br/course/educacao-financeira/continue'), 'educacao-financeira');
+    assert.equal(core.lessonIdFromUrl(classpage), '201579');
+});
+
+test('a course speed applies only to its course, the default to every other course', () => {
+    const settings = { playbackSpeed: 1.25, perCourseSettings: true, courseProfiles: { javascript: { playbackSpeed: 2 } } };
+    assert.equal(core.effectivePlaybackSpeed(settings, 'javascript'), 2);
+    assert.equal(core.effectivePlaybackSpeed(settings, 'python'), 1.25);
+    assert.equal(core.effectivePlaybackSpeed({ ...settings, perCourseSettings: false }, 'javascript'), 1.25);
+    assert.equal(core.effectivePlaybackSpeed({}, 'javascript'), 1);
+});
+
+test('saving a speed inside a course never rewrites the default speed', () => {
+    const settings = { playbackSpeed: 1, perCourseSettings: true, courseProfiles: { python: { playbackSpeed: 1.5 } } };
+    assert.deepEqual(core.playbackSpeedUpdate(settings, 'javascript', 2), {
+        courseProfiles: { python: { playbackSpeed: 1.5 }, javascript: { playbackSpeed: 2 } }
+    });
+    assert.deepEqual(core.playbackSpeedUpdate({ ...settings, perCourseSettings: false }, 'javascript', 2), { playbackSpeed: 2 });
+    assert.deepEqual(core.playbackSpeedUpdate(settings, null, 2), { playbackSpeed: 2 });
 });
 
 test('loading placeholders are never treated as readable lessons', () => {
@@ -105,15 +120,6 @@ test('companion renders transitions outside the RSVP and TTS content view', asyn
     assert.match(companionScript, /if \(currentMode !== 'CONTENT' \|\| !AluraFlowCore\.canReadLesson\(currentData\)\)/);
 });
 
-test('current Video.js markup exposes the preferred media and controls', async () => {
-    const fixture = await readFile(new URL('./fixtures/video-js.html', import.meta.url), 'utf8');
-    assert.match(fixture, /<video-js[^>]*class="[^"]*video-js[^"]*vjs-paused/);
-    assert.match(fixture, /<video[^>]*class="vjs-tech"[^>]*autoplay/);
-    assert.match(fixture, /class="vjs-big-play-button"/);
-    assert.match(fixture, /class="vjs-play-control/);
-    assert.match(fixture, /class="autoplay-cancel-button"/);
-});
-
 test('speed shortcut always advances to the next supported speed', () => {
     assert.equal(core.nextPlaybackSpeed(undefined), 1);
     assert.equal(core.nextPlaybackSpeed(1), 1.25);
@@ -132,14 +138,6 @@ test('companion provides manual navigation after a completed quiz', async () => 
     const companion = await readFile(new URL('../reading.html', import.meta.url), 'utf8');
     assert.match(companion, /id="quizNextBtn"/);
     assert.match(companion, /Avançar para a próxima lição/);
-});
-
-test('new text lesson structure contains enough readable content', async () => {
-    const fixture = await readFile(new URL('./fixtures/new-text-lesson.html', import.meta.url), 'utf8');
-    assert.match(fixture, /<section aria-label="Conteúdo da aula" class="relative select-text">/);
-    const blockCount = [...fixture.matchAll(/<(?:p|h[1-3]|li|blockquote|pre)\b/g)].length;
-    const text = fixture.replace(/<[^>]+>/g, ' ');
-    assert.equal(core.isReadableTextCandidate(text, blockCount), true);
 });
 
 test('text fingerprint ignores harmless whitespace changes', () => {
@@ -161,6 +159,37 @@ test('RSVP delay respects speed, punctuation, and long words', () => {
     assert.ok(core.rsvpWordDelay('extraordinariamente', 300) > 200);
 });
 
+test('speed reading moves by sentence like a track player', () => {
+    // 0 Uma · 1 frase. · 2 “Outra · 3 frase · 4 bem · 5 longa!” · 6 Fim…
+    const words = core.parseRsvpText('Uma frase. “Outra frase bem longa!” Fim…');
+    assert.equal(core.rsvpNextSentenceIndex(words, 0), 2);
+    assert.equal(core.rsvpNextSentenceIndex(words, 3), 6);
+    assert.equal(core.rsvpNextSentenceIndex(words, 6), 6, 'stays in the last sentence');
+    assert.equal(core.rsvpPreviousSentenceIndex(words, 5), 2, 'deep in a sentence: back to its start');
+    assert.equal(core.rsvpPreviousSentenceIndex(words, 3), 0, 'one word in: previous sentence');
+    assert.equal(core.rsvpPreviousSentenceIndex(words, 2), 0);
+    assert.equal(core.rsvpPreviousSentenceIndex(words, 0), 0);
+    assert.equal(core.rsvpNextSentenceIndex([], 0), 0);
+});
+
+test('speed reading estimates the time left', () => {
+    assert.equal(core.rsvpTimeLeftLabel(0, 300), 'fim');
+    assert.equal(core.rsvpTimeLeftLabel(150, 300), 'falta menos de 1 min');
+    assert.equal(core.rsvpTimeLeftLabel(900, 300), 'faltam ~3 min');
+});
+
+test('companion keys map to actions only where they make sense', () => {
+    assert.deepEqual(core.companionKeyAction('3', { view: 'quiz', optionCount: 4 }), { type: 'select-option', index: 2 });
+    assert.deepEqual(core.companionKeyAction('B', { view: 'quiz', optionCount: 4 }), { type: 'select-option', index: 1 });
+    assert.equal(core.companionKeyAction('e', { view: 'quiz', optionCount: 4 }), null);
+    assert.equal(core.companionKeyAction('Enter', { view: 'quiz', quizSolved: false }), null);
+    assert.deepEqual(core.companionKeyAction('Enter', { view: 'quiz', quizSolved: true }), { type: 'next-lesson' });
+    assert.deepEqual(core.companionKeyAction(' ', { view: 'text' }), { type: 'toggle-reading' });
+    assert.equal(core.companionKeyAction('ArrowLeft', { view: 'text', readingMode: 'tts' }), null);
+    assert.deepEqual(core.companionKeyAction('ArrowLeft', { view: 'text', readingMode: 'rsvp' }), { type: 'previous-sentence' });
+    assert.equal(core.companionKeyAction(' ', { view: null }), null);
+});
+
 test('automatic reading override applies equally to text lessons and video transcriptions', () => {
     assert.equal(core.shouldAutoStartReading(undefined, true), true);
     assert.equal(core.shouldAutoStartReading(undefined, false), false);
@@ -175,25 +204,13 @@ test('automatic RSVP requires visible and focused companion attention', () => {
     assert.equal(core.canAutoStartRsvp({ documentVisible: true, documentFocused: true, windowFocused: false }), false);
 });
 
-test('current video sidebar exposes a stable transcription source for RSVP', async () => {
-    const [fixture, contentScript, companionScript, background] = await Promise.all([
-        readFile(new URL('./fixtures/video-transcription-sidebar.html', import.meta.url), 'utf8'),
-        readFile(new URL('../content.js', import.meta.url), 'utf8'),
+// The companion and background still lack a page-level harness, so these check
+// their source for the transcript focus rules.
+test('companion and background keep the transcript RSVP focus rules', async () => {
+    const [companionScript, background] = await Promise.all([
         readFile(new URL('../reading.js', import.meta.url), 'utf8'),
         readFile(new URL('../background.js', import.meta.url), 'utf8')
     ]);
-    assert.match(fixture, /title="Transcrição">Transcrição/);
-    assert.match(fixture, /Esta é a transcrição completa/);
-    assert.match(contentScript, /function loadVideoTranscription/);
-    assert.match(contentScript, /stableSince/);
-    assert.match(contentScript, /transcriptWordCount/);
-    assert.match(contentScript, /autoStartReading: settings\.autoReadEnabled !== false/);
-    assert.match(contentScript, /function cancelNativeVideoAdvance/);
-    assert.match(contentScript, /blockNativeContinueDuringTranscript/);
-    assert.match(contentScript, /transcriptLoadingLessonId = context\.lessonId/);
-    assert.match(contentScript, /loadingReason: 'video-transcription'/);
-    assert.match(contentScript, /transcriptLoadingPending && transcriptLoadingLessonId === context\.lessonId/);
-    assert.doesNotMatch(contentScript, /loadVideoTranscription\(video\?\.duration\)/);
     assert.match(companionScript, /currentData\?\.transcriptText/);
     assert.match(companionScript, /shouldAutoStartReading\(data\.autoStartReading, settings\.autoReadEnabled\)/);
     assert.match(companionScript, /checkCompanionAttention\(hasAttention/);
@@ -202,25 +219,6 @@ test('current video sidebar exposes a stable transcription source for RSVP', asy
     assert.match(background, /function firefoxHasFocusedWindow/);
     assert.match(background, /ensureCompanionWindow\(message, firefoxIsActive\)/);
     assert.doesNotMatch(background, /PREPARE_READING_MODE'[\s\S]{0,180}focused:\s*true/);
-    assert.doesNotMatch(contentScript, /textTracks|vjs-subtitles|vjs-captions/);
-});
-
-test('on-page video transcription below player exposes readable content and proper selectors', async () => {
-    const [fixture, contentScript] = await Promise.all([
-        readFile(new URL('./fixtures/video-transcription-onpage.html', import.meta.url), 'utf8'),
-        readFile(new URL('../content.js', import.meta.url), 'utf8')
-    ]);
-    assert.match(fixture, /<section id="transcription"/);
-    assert.match(fixture, /aria-label="Transcrição da aula"/);
-    assert.match(fixture, /Encerrando o assunto sobre a importância da educação financeira/);
-    assert.match(contentScript, /function findOnPageTranscriptionElement/);
-    assert.match(contentScript, /#transcription/);
-    assert.match(contentScript, /section\[aria-label\*="transcri"/);
-    assert.match(contentScript, /function sanitizeTranscriptionClone/);
-    const blockCount = [...fixture.matchAll(/<(?:p|h[1-3]|li|blockquote|pre)\b/g)].length;
-    const text = fixture.replace(/<[^>]+>/g, ' ');
-    assert.equal(core.isReadableTextCandidate(text, blockCount), true);
-    assert.ok(core.parseRsvpText(text).length > 100);
 });
 
 test('popup and companion expose RSVP settings and mode controls', async () => {
@@ -243,6 +241,8 @@ test('popup and companion expose RSVP settings and mode controls', async () => {
     assert.doesNotMatch(popup, /Velocidade da transcrição/);
     assert.match(popup, /id="shortcutsHeading"/);
     assert.match(popup, /id="historyHeading"/);
+    assert.match(popup, /id="mediaKeysToggle"/);
+    assert.match(popupScript, /mediaKeysEnabled/);
     assert.match(popupScript, /function updateConditionalSettings/);
     assert.match(popupScript, /Confirmar exclusão/);
     assert.match(companion, /data-reading-mode="rsvp"/);
@@ -250,7 +250,9 @@ test('popup and companion expose RSVP settings and mode controls', async () => {
     assert.match(companion, /id="rsvpStage"[^>]*role="button"[^>]*tabindex="0"/);
     assert.match(companionScript, /ui\.rsvpStage\.addEventListener\('click', toggleRsvp\)/);
     assert.match(companionScript, /event\.key !== 'Enter' && event\.key !== ' '/);
-    assert.match(companion, /#ttsBtnTop\s*\{[^}]*position:\s*absolute;[^}]*left:\s*50%;[^}]*translateX\(-50%\)/s);
+    // The play button sits in the middle column and keeps one width as its label changes.
+    assert.match(companion, /\.reading-dock\s*\{[^}]*grid-template-columns:\s*1fr auto 1fr/s);
+    assert.match(companion, /#ttsBtnTop\s*\{[^}]*min-width:/);
     assert.match(companionScript, /transcriptRsvpWpm/);
     assert.match(background, /transcriptRsvpWpm: 300/);
     assert.match(notices, /MIT License/);

@@ -151,13 +151,7 @@ function storePlaybackSpeed(rawSpeed, courseId, callback = () => {}) {
     }
 
     chrome.storage.local.get(['perCourseSettings', 'courseProfiles'], local => {
-        const update = { playbackSpeed: speed };
-        if (local.perCourseSettings !== false && courseId) {
-            const courseProfiles = { ...(local.courseProfiles || {}) };
-            courseProfiles[courseId] = { ...(courseProfiles[courseId] || {}), playbackSpeed: speed };
-            update.courseProfiles = courseProfiles;
-        }
-        chrome.storage.local.set(update, () => callback({ ok: true, speed }));
+        chrome.storage.local.set(AluraFlowCore.playbackSpeedUpdate(local, courseId, speed), () => callback({ ok: true, speed }));
     });
 }
 
@@ -187,11 +181,7 @@ function cyclePlaybackSpeed(callback = () => {}) {
 
     chrome.storage.local.get(['playbackSpeed', 'perCourseSettings', 'courseProfiles'], local => {
         chrome.storage.session.get(['latestState'], session => {
-            const courseId = session.latestState?.data?.courseId;
-            const profileSpeed = local.perCourseSettings !== false && courseId
-                ? local.courseProfiles?.[courseId]?.playbackSpeed
-                : null;
-            const current = Number(profileSpeed ?? local.playbackSpeed ?? 1);
+            const current = AluraFlowCore.effectivePlaybackSpeed(local, session.latestState?.data?.courseId);
             applyPlaybackSpeed(AluraFlowCore.nextPlaybackSpeed(current), callback);
         });
     });
@@ -354,7 +344,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     const routedCommands = new Set([
-        'COMMAND_PLAY_PAUSE', 'COMMAND_NEXT', 'COMMAND_PREV', 'COMMAND_CYCLE_SPEED',
+        'COMMAND_PLAY_PAUSE', 'COMMAND_NEXT', 'COMMAND_PREV',
         'UPDATE_AUTO_ADVANCE', 'SELECT_OPTION', 'FINISH_READING', 'AUTO_FINISH_READING', 'CANCEL_AUTO_ADVANCE',
         'RETRY_VIDEO_TRANSCRIPTION'
     ]);
@@ -450,6 +440,7 @@ chrome.runtime.onInstalled.addListener(() => {
         autoAdvanceEnabled: true,
         autoAdvanceDelay: 5,
         shortcutsEnabled: true,
+        mediaKeysEnabled: true,
         autoReadEnabled: true,
         readingMode: 'tts',
         rsvpWpm: 300,

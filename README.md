@@ -11,6 +11,17 @@ A **Alura Flow** resolve isso trazendo o curso até você, e não o contrário. 
 
 ## Funcionalidades Principais
 
+### Novidades da versão 2.6.0
+
+* **Companion pelo teclado:** <kbd>Espaço</kbd> ouve, inicia ou pausa a leitura; na leitura rápida, <kbd>←</kbd> volta ao início da frase e <kbd>→</kbd> pula para a próxima; nos quizzes, números ou letras escolhem a alternativa e <kbd>Enter</kbd> avança depois de acertar.
+* **Quizzes em voz alta:** o companion lê a pergunta e as alternativas ("Alternativa A…"). No modo voz, com "Iniciar automaticamente" ligado, a leitura começa sozinha.
+* **Visual renovado:** companion com cabeçalho que indica o tipo de aula, barra de controles fixa, ícones próprios, tempo restante na leitura rápida e acertos/erros indicados por texto, não só por cor. O popup prioriza a aula atual e a velocidade, com as demais opções em grupos recolhíveis.
+* **Teclas de mídia:** as teclas de próxima e anterior faixa (teclado, fone de ouvido ou painel de mídia do sistema) trocam de aula durante os vídeos, mesmo com outro programa em primeiro plano. Pode ser desligado no popup.
+* **Compatível com o novo layout da Alura:** aulas em endereços `/classpage/…` e páginas sem botão "Anterior" (o companion volta pela lista de aulas da barra lateral, inclusive no "Desfazer").
+* **Avanço automático mais seguro:** se a Alura trocar de aula durante a contagem regressiva, a extensão não clica em "Avançar" de novo e não pula a aula seguinte.
+* **Velocidade por curso de verdade:** ajustar a velocidade dentro de um curso não altera mais a velocidade padrão dos outros cursos.
+* **Menos uso de CPU durante vídeos:** a detecção de quizzes deixou de reagir a cada atualização do player.
+
 ### Novidades da versão 2.5.8
 
 * **Sessão segura por aba:** escolha exatamente qual curso o companion deve controlar.
@@ -70,12 +81,26 @@ Os atalhos funcionam mesmo que você esteja navegando em outro site (ex: lendo d
 | `Ctrl` + `Alt` + **P** | **Play / Pause** | Pausa a reprodução do vídeo atual. |
 | `Ctrl` + `Alt` + **N** | **Next Lesson** | Avança para a próxima lição (vídeo ou texto). |
 | `Ctrl` + `Alt` + **S** | **Speed Cycle** | Alterna velocidades (1x → 1,25x → 1,5x → 2x). |
+| ⏭ / ⏮ (teclas de mídia) | **Próxima / anterior aula** | Funcionam enquanto o vídeo da aula é a mídia ativa do Firefox, mesmo em outro programa. Play/pause continua com o comportamento padrão do Firefox. |
+
+### No companion
+
+| Tecla | Onde | Ação |
+| --- | --- | --- |
+| `Espaço` | Textos e quizzes | Ouvir, iniciar, pausar ou retomar a leitura. |
+| `←` / `→` | Leitura rápida | Volta ao início da frase (ou à frase anterior) / pula para a próxima frase. |
+| `1`–`9` ou `A`–`Z` | Quizzes | Escolhe a alternativa correspondente. |
+| `Enter` | Quizzes | Avança para a próxima lição depois de acertar. |
+
+Com o foco num botão, `Espaço` e `Enter` continuam acionando o botão.
 
 ---
 
-## Instalação (Desenvolvimento)
+## Instalação
 
-Como a extensão ainda não está na loja oficial do Firefox, você pode instalá-la em modo de depuração:
+Instale pela loja oficial: [Alura Flow no addons.mozilla.org](https://addons.mozilla.org/firefox/addon/alura-flow/).
+
+### Modo de desenvolvimento
 
 1. Baixe ou clone este repositório.
 2. No Firefox, digite na barra de endereços: `about:debugging#/runtime/this-firefox`
@@ -97,17 +122,27 @@ Ao clicar no ícone da extensão na barra de ferramentas, você pode:
 
 ## Validação para desenvolvimento
 
-Os testes de regressão usam apenas o Node.js e cobrem a identificação de respostas corretas/incorretas, quizzes de múltipla escolha, roteamento de abas e identidade das aulas:
+Requer Node.js. Instale as ferramentas uma vez com `npm install`.
+
+| Comando | O que faz |
+| --- | --- |
+| `npm test` | Testes automáticos. Executam o `content.js`, o `background.js` e o companion reais sobre páginas de exemplo (`tests/fixtures`), com relógio simulado. |
+| `npm run screenshots` | Gera capturas do companion e do popup em todos os estados, nos temas claro e escuro (`tests/preview/output/`). |
+| `npm run lint` | Valida o pacote com as regras oficiais de extensões do Firefox (`web-ext lint`). |
+| `npm run build` | Gera o `.zip` para enviar ao addons.mozilla.org (em `web-ext-artifacts/`). |
+| `npm start` | Abre um Firefox temporário com a extensão carregada. |
+
+### Teste no site real
+
+Quando a Alura muda o layout, `npm run live:check` carrega a extensão num Firefox controlado, abre aulas reais e informa o que foi reconhecido (vídeo, texto, quiz, botões, transcrição), o que a extensão enviou ao companion e o que ele exibiu. Também salva uma cópia de cada página em `tests/live/output/` (fora do Git) para atualizar os exemplos de teste.
 
 ```bash
-node --test tests/core.test.mjs
+npm run live:login                       # entrar na Alura uma vez num perfil de teste separado
+npm run live:discover -- https://cursos.alura.com.br/dashboard
+npm run live:check -- <url de uma aula> --earlier --completed
 ```
 
-Para validar o pacote com as regras oficiais de extensões do Firefox:
-
-```bash
-web-ext lint --source-dir .
-```
+O perfil de teste fica em `~/.alura-flow-live-profile`, com avanço e leitura automáticos desligados. Para não registrar progresso em aulas que você ainda não fez, `--earlier` abre só as aulas anteriores à indicada e `--completed` só as seções já concluídas. `--media-keys` e `--transcript` testam as teclas de mídia e a leitura da transcrição após o vídeo.
 
 ---
 
@@ -125,4 +160,4 @@ Ambientes corporativos e rotinas de estudo intensas muitas vezes geram fadiga. A
 
 ## Licença
 
-Este projeto é de código aberto. Sinta-se livre para contribuir ou modificar para seu uso pessoal.
+Distribuído sob a [Licença MIT](LICENSE). Contribuições são bem-vindas. Componentes de terceiros estão listados em [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

@@ -76,6 +76,26 @@
         return speeds.find(speed => speed > current + 0.01) || speeds[0];
     }
 
+    function effectivePlaybackSpeed(settings = {}, courseId = null) {
+        const profileSpeed = settings.perCourseSettings !== false && courseId
+            ? Number(settings.courseProfiles?.[courseId]?.playbackSpeed)
+            : NaN;
+        if (Number.isFinite(profileSpeed) && profileSpeed > 0) return profileSpeed;
+        const speed = Number(settings.playbackSpeed);
+        return Number.isFinite(speed) && speed > 0 ? speed : 1;
+    }
+
+    // With per-course profiles on, a speed chosen inside a course belongs to that
+    // course only; the default stays as is for courses without their own speed.
+    function playbackSpeedUpdate(settings = {}, courseId, speed) {
+        if (settings.perCourseSettings !== false && courseId) {
+            const courseProfiles = { ...(settings.courseProfiles || {}) };
+            courseProfiles[courseId] = { ...(courseProfiles[courseId] || {}), playbackSpeed: speed };
+            return { courseProfiles };
+        }
+        return { playbackSpeed: speed };
+    }
+
     function shouldOfferUndo(autoAdvanceReason) {
         return autoAdvanceReason !== 'quiz';
     }
@@ -151,6 +171,69 @@
         return Math.round(delay);
     }
 
+    function isSentenceEnd(word) {
+        return /[.!?…][”’"'»)\]]*$/.test(String(word || ''));
+    }
+
+    function rsvpSentenceStart(words, index) {
+        if (!Array.isArray(words) || !words.length) return 0;
+        let start = Math.min(Math.max(0, Number(index) || 0), words.length - 1);
+        while (start > 0 && !isSentenceEnd(words[start - 1])) start -= 1;
+        return start;
+    }
+
+    // Like "previous track": back to the start of the current sentence, or to the
+    // previous sentence when already at (or one word into) the start.
+    function rsvpPreviousSentenceIndex(words, index) {
+        const start = rsvpSentenceStart(words, index);
+        if (start === 0 || index - start > 1) return start;
+        return rsvpSentenceStart(words, start - 1);
+    }
+
+    // First word of the next sentence; stays put in the last sentence so skipping
+    // ahead never finishes the reading (which could trigger auto-advance).
+    function rsvpNextSentenceIndex(words, index) {
+        if (!Array.isArray(words)) return 0;
+        for (let current = Math.max(0, Number(index) || 0); current < words.length - 1; current += 1) {
+            if (isSentenceEnd(words[current])) return current + 1;
+        }
+        return Math.max(0, Math.min(Number(index) || 0, words.length - 1));
+    }
+
+    // Pauses at punctuation make the real time a little longer; this is an estimate.
+    function rsvpTimeLeftLabel(wordsLeft, wordsPerMinute) {
+        const words = Math.max(0, Number(wordsLeft) || 0);
+        if (!words) return 'fim';
+        const minutes = words / Math.min(1200, Math.max(50, Number(wordsPerMinute) || 300));
+        return minutes < 1 ? 'falta menos de 1 min' : `faltam ~${Math.round(minutes)} min`;
+    }
+
+    // Keys 1–9 or the option letters shown in the companion (A, B, C…).
+    function quizOptionIndexForKey(key, optionCount) {
+        const value = String(key || '');
+        let index = -1;
+        if (/^[1-9]$/.test(value)) index = Number(value) - 1;
+        else if (/^[a-z]$/i.test(value)) index = value.toLowerCase().charCodeAt(0) - 97;
+        return index >= 0 && index < Number(optionCount) ? index : null;
+    }
+
+    // Maps a key pressed in the companion to an action, or null to leave it to the browser.
+    function companionKeyAction(key, context = {}) {
+        if (context.view === 'quiz') {
+            const index = quizOptionIndexForKey(key, context.optionCount);
+            if (index !== null) return { type: 'select-option', index };
+            if (key === ' ') return { type: 'toggle-speech' };
+            if (key === 'Enter' && context.quizSolved) return { type: 'next-lesson' };
+            return null;
+        }
+        if (context.view === 'text') {
+            if (key === ' ') return { type: 'toggle-reading' };
+            if (context.readingMode === 'rsvp' && key === 'ArrowLeft') return { type: 'previous-sentence' };
+            if (context.readingMode === 'rsvp' && key === 'ArrowRight') return { type: 'next-sentence' };
+        }
+        return null;
+    }
+
     function chooseControlledTab(tabs, boundTabId) {
         const list = Array.isArray(tabs) ? tabs : [];
         if (Number.isInteger(boundTabId)) {
@@ -167,7 +250,7 @@
         try {
             const url = new URL(rawUrl);
             const parts = url.pathname.split('/').filter(Boolean);
-            const courseIndex = parts.findIndex(part => part === 'course' || part === 'cursos');
+            const courseIndex = parts.findIndex(part => part === 'course' || part === 'cursos' || part === 'classpage');
             if (courseIndex >= 0 && parts[courseIndex + 1]) return parts[courseIndex + 1];
             const taskIndex = parts.indexOf('task');
             if (taskIndex > 0) return parts.slice(0, taskIndex).join('/');
@@ -197,6 +280,8 @@
         isLoadingState,
         canReadLesson,
         nextPlaybackSpeed,
+        effectivePlaybackSpeed,
+        playbackSpeedUpdate,
         shouldOfferUndo,
         isReadableTextCandidate,
         textFingerprint,
@@ -206,6 +291,12 @@
         rsvpOrpIndex,
         splitRsvpWord,
         rsvpWordDelay,
+        rsvpSentenceStart,
+        rsvpPreviousSentenceIndex,
+        rsvpNextSentenceIndex,
+        rsvpTimeLeftLabel,
+        quizOptionIndexForKey,
+        companionKeyAction,
         chooseControlledTab,
         courseIdFromUrl,
         lessonIdFromUrl
